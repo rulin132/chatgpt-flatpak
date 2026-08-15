@@ -11,6 +11,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Not in the flatpak container: it has neither dnf nor shellcheck, so the old
+  # `dnf install -y ShellCheck || true` masked its own failure and the next line
+  # died with "shellcheck: command not found". The ubuntu runner image ships
+  # shellcheck. Runs the unit tests too, since they need nothing else.
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: shellcheck -x scripts/*.sh tests/*.sh build-aux/apply_extra build-aux/launcher.sh
+      - run: tests/test-sync-version.sh
+
   lint:
     runs-on: ubuntu-latest
     container:
@@ -18,15 +29,16 @@ jobs:
       options: --privileged
     steps:
       - uses: actions/checkout@v4
-      - name: shellcheck
-        run: |
-          dnf install -y ShellCheck || true
-          shellcheck -x scripts/*.sh build-aux/apply_extra build-aux/launcher.sh
       - name: manifest lint
         run: flatpak run --command=flatpak-builder-lint org.flatpak.Builder manifest io.github.rulin132.ChatGPT.yaml
 
+  # Deliberately does NOT depend on lint or shellcheck. The smoke test below is
+  # the only thing that catches upstream layout drift before it reaches users,
+  # and gating it on the linters would have meant it never ran at all: the
+  # manifest lint currently fails on appid-url-not-reachable, which is tied to
+  # an unresolved app-id decision, and the shellcheck job was failing outright.
+  # A style or naming problem must not be able to hide a broken payload.
   build:
-    needs: lint
     strategy:
       fail-fast: false
       matrix:
@@ -42,25 +54,44 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
-        with:
-          bundle: io.github.rulin132.ChatGPT.flatpak
-          manifest-path: io.github.rulin132.ChatGPT.yaml
-          arch: ${{ matrix.arch }}
-          cache-key: flatpak-builder-${{ matrix.arch }}-${{ github.sha }}
-          # The vendor payload is extra-data: it is fetched on the user's
-          # machine at install time, so the build itself never touches
-          # persistent.oaistatic.com. Only the smoke test below does.
-          upload-artifact: true
+      # Built into a local OSTree repo, not a bundle: `flatpak build-bundle`
+      # cannot carry an extra-data source (flatpak#1334), so a bundle has no
+      # payload and cannot be installed. A repo remote reads the extra-data
+      # source from commit metadata and works.
+      #
+      # The vendor payload is extra-data: it is fetched at install time, so the
+      # build itself never touches persistent.oaistatic.com. Only the smoke
+      # test below does.
+      - name: build
+        run: |
+          set -euo pipefail
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak-builder --user --install-deps-from=flathub --force-clean \
+            --disable-rofiles-fuse --arch=${{ matrix.arch }} \
+            --repo=repo build io.github.rulin132.ChatGPT.yaml
 
-      # Real install exercises apply_extra — the only place upstream layout
+      # Real install exercises apply_extra, the only place upstream layout
       # changes can bite. This is the check that catches a rotated .deb whose
-      # internals moved, which a manifest lint cannot see.
+      # internals moved, which a manifest lint cannot see. It is the only thing
+      # standing between upstream layout drift and users, so it must actually
+      # run: assert the payload arrived rather than trusting a zero exit.
       - name: smoke test (install + apply_extra)
         if: matrix.arch == 'x86_64'
         run: |
-          flatpak install --user -y --bundle io.github.rulin132.ChatGPT.flatpak
-          flatpak run --command=cat io.github.rulin132.ChatGPT /app/extra/VERSION
-          flatpak run --command=sh io.github.rulin132.ChatGPT -c \
-            'test -f /app/extra/app.env && . /app/extra/app.env && test -x "$APP_BIN"'
-          echo "apply_extra produced a runnable payload"
+          set -euo pipefail
+          flatpak remote-add --user --if-not-exists --no-gpg-verify chatgpt-ci "$PWD/repo"
+          flatpak install --user -y chatgpt-ci io.github.rulin132.ChatGPT
+
+          version=$(flatpak run --command=cat io.github.rulin132.ChatGPT /app/extra/VERSION)
+          echo "apply_extra reported upstream version: $version"
+          test -n "$version" && test "$version" != unknown
+
+          flatpak run --command=sh io.github.rulin132.ChatGPT -c '
+            set -eu
+            test -f /app/extra/app.env || { echo "no app.env"; exit 1; }
+            . /app/extra/app.env
+            test -x "$APP_BIN" || { echo "APP_BIN not executable: $APP_BIN"; exit 1; }
+            head -c4 "$APP_BIN" | grep -q ELF || { echo "APP_BIN is not an ELF binary"; exit 1; }
+            test -f /app/extra/app/resources/app.asar || { echo "no app.asar"; exit 1; }
+            echo "payload OK: $APP_BIN"
+          '
