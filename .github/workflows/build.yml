@@ -35,19 +35,24 @@ jobs:
       options: --privileged
     steps:
       - uses: actions/checkout@v4
-      # The container does not ship org.flatpak.Builder, so the old one-liner
-      # died with "app/org.flatpak.Builder/x86_64/master not installed" and the
-      # manifest was never actually linted.
+      # Call the binary the image ships, NOT `flatpak run org.flatpak.Builder`.
+      # The original one-liner used the latter and died with
+      # "app/org.flatpak.Builder/x86_64/master not installed"; installing that
+      # flatpak does not help either, because flatpak-builder-lint shells out to
+      # flatpak-builder, which then cannot create its .flatpak-builder state dir
+      # in the runner workspace from inside the Builder sandbox:
+      # "Permission denied". If a future image drops the binary this fails loudly
+      # with "command not found", which is the honest failure.
+      #
+      # Locally there is no bare binary, so `make lint` uses the flatpak form.
+      # That works because the checkout is under $HOME, which the sandbox can write.
       #
       # --exceptions switches the mechanism on. --user-exceptions on its own is
       # silently inert: the whole exceptions block is gated on the former.
       - name: manifest lint
         run: |
-          set -euo pipefail
-          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-          flatpak install --user -y flathub org.flatpak.Builder
-          flatpak run --command=flatpak-builder-lint org.flatpak.Builder \
-            --exceptions --user-exceptions flatpak-builder-lint-exceptions.json \
+          flatpak-builder-lint --exceptions \
+            --user-exceptions flatpak-builder-lint-exceptions.json \
             manifest io.github.rulin132.ChatGPT.yaml
 
   # Deliberately does NOT depend on lint or shellcheck. The smoke test below is
