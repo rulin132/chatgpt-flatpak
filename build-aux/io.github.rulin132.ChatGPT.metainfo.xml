@@ -47,6 +47,7 @@
        flatpak-external-data-checker will NOT bump this by itself, because the
        rolling URL never changes. -->
   <releases>
-    <release version="0.0.0" date="2026-08-14"/>
+    <release version="26.810.52044" date="2026-08-15"/>
+    <release version="26.810.50856" date="2026-08-15"/>
   </releases>
 </component>
