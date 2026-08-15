@@ -97,6 +97,33 @@ scripts/inspect-deb.sh           # dump the upstream .deb layout
 ELF binary at install time rather than hardcoding upstream's paths, and aborts
 with a specific message rather than producing a half-unpacked app.
 
+## Known issues
+
+**The avatar overlay renders as an opaque box on Wayland.** Upstream draws the
+"pet" in a second, frameless, transparent window, and this Electron build does
+not composite window transparency on the Wayland Ozone backend. Measured against
+26.810.52044: broken on Wayland, broken on Wayland with Vulkan disabled, correct
+on XWayland. It is an upstream platform bug, not something this packaging causes.
+
+If it bothers you, opt into XWayland per-install:
+
+```sh
+flatpak override --user --socket=x11 io.github.rulin132.ChatGPT
+```
+
+That is a real trade, not a free fix. XWayland costs you native Wayland scaling
+and input handling, and X11 is a shared server, so the app can observe other X11
+clients. Revert with `--nosocket=x11`.
+
+**Do not "fix" this by adding `--socket=x11` to the manifest.** The launcher
+passes `--ozone-platform-hint=auto`, and this Electron prefers X11 whenever
+`DISPLAY` is set. Granting the socket therefore moves *every* user to XWayland
+rather than offering a fallback. If that ever becomes desirable, the hint has to
+be pinned to `wayland` in the same change.
+
+**A blank window is not fixed with `--disable-gpu`.** Use `CHATGPT_DISABLE_GPU=1`,
+which routes ANGLE at SwiftShader. See the note in `build-aux/launcher.sh`.
+
 ## Sandbox
 
 Sealed by default: **no** `--filesystem=host`, **no**

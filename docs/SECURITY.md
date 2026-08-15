@@ -24,6 +24,7 @@ strategy needs `expose-pids`.
 | `--filesystem=host` / `=home` | the app sees no user files until you say so |
 | `--talk-name=org.freedesktop.Flatpak` | this permits `flatpak-spawn --host`, i.e. arbitrary command execution outside the sandbox. Flathub treats it as an exception-requiring rule. VS Code holds it, plus `--filesystem=host` and `--allow=devel`, which is why a flatpak'd VS Code is not meaningfully confined |
 | `--device=all` | `--device=dri` covers GPU without handing over every USB device |
+| `--socket=x11` | `--socket=fallback-x11` gives X11 only when there is no Wayland session. XWayland is a shared server: a client with X11 access can observe other X11 clients' windows and input. See the avatar-overlay note in the README before granting it to work around a rendering bug |
 
 Grant the minimum you need, per directory:
 
