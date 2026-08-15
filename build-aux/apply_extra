@@ -80,11 +80,11 @@ if [ -f app/chrome-sandbox ] || [ -f app/chrome_sandbox ]; then
 fi
 
 # --- 6. fix the Wayland window icon / .desktop association ------------------
-# Electron reports "{productName}.desktop"; ours is io.github.OWNER.ChatGPT.
+# Electron reports "{productName}.desktop"; ours is io.github.rulin132.ChatGPT.
 # Cosmetic only — warn, do not abort, if upstream changes the asar format.
 if command -v patch-electron-desktop-filename >/dev/null 2>&1; then
     patch-electron-desktop-filename \
-        --desktop-filename io.github.OWNER.ChatGPT \
+        --desktop-filename io.github.rulin132.ChatGPT \
         --skip-integrity-check app/resources/app.asar \
         || echo "apply_extra: WARNING desktop-filename patch failed (window icon may be wrong)" >&2
 fi

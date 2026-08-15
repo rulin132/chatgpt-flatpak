@@ -1,4 +1,4 @@
-APP_ID   ?= io.github.OWNER.ChatGPT
+APP_ID   ?= io.github.rulin132.ChatGPT
 MANIFEST := $(APP_ID).yaml
 REPO     ?= repo
 BUILDDIR ?= build

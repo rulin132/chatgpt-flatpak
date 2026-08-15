@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>io.github.OWNER.ChatGPT</id>
+  <id>io.github.rulin132.ChatGPT</id>
   <name>ChatGPT</name>
   <summary>ChatGPT, Work and Codex desktop app</summary>
 
@@ -30,9 +30,9 @@
     </p>
   </description>
 
-  <launchable type="desktop-id">io.github.OWNER.ChatGPT.desktop</launchable>
+  <launchable type="desktop-id">io.github.rulin132.ChatGPT.desktop</launchable>
   <url type="homepage">https://openai.com/codex/</url>
-  <url type="bugtracker">https://github.com/OWNER/codex-flatpak/issues</url>
+  <url type="bugtracker">https://github.com/rulin132/codex-flatpak/issues</url>
 
   <content_rating type="oars-1.1">
     <content_attribute id="social-chat">intense</content_attribute>

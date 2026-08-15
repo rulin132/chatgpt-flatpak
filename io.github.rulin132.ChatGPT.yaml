@@ -1,4 +1,4 @@
-app-id: io.github.OWNER.ChatGPT
+app-id: io.github.rulin132.ChatGPT
 runtime: org.freedesktop.Platform
 runtime-version: '25.08'
 sdk: org.freedesktop.Sdk
@@ -17,7 +17,7 @@ tags:
 #   --talk-name=org.freedesktop.Flatpak   no flatpak-spawn --host = no host escape
 #
 # Grant a workspace explicitly, per-user, per-directory:
-#   flatpak override --user --filesystem=~/code io.github.OWNER.ChatGPT
+#   flatpak override --user --filesystem=~/code io.github.rulin132.ChatGPT
 # ---------------------------------------------------------------------------
 finish-args:
   # zypak's spawn strategy needs expose-pids/SpawnStarted (flatpak >= 1.8.2).
@@ -52,12 +52,12 @@ modules:
       - install -Dm755 launcher.sh /app/bin/chatgpt-launcher
       # AppStream/desktop metadata MUST be installed at build time: the store
       # index has to exist before any extra-data is downloaded.
-      - install -Dm644 io.github.OWNER.ChatGPT.desktop
-        /app/share/applications/io.github.OWNER.ChatGPT.desktop
-      - install -Dm644 io.github.OWNER.ChatGPT.metainfo.xml
-        /app/share/metainfo/io.github.OWNER.ChatGPT.metainfo.xml
+      - install -Dm644 io.github.rulin132.ChatGPT.desktop
+        /app/share/applications/io.github.rulin132.ChatGPT.desktop
+      - install -Dm644 io.github.rulin132.ChatGPT.metainfo.xml
+        /app/share/metainfo/io.github.rulin132.ChatGPT.metainfo.xml
       - for s in 16 32 48 64 128 256 512; do install -Dm644 "icons/$s.png"
-        "/app/share/icons/hicolor/${s}x${s}/apps/io.github.OWNER.ChatGPT.png"; done
+        "/app/share/icons/hicolor/${s}x${s}/apps/io.github.rulin132.ChatGPT.png"; done
     sources:
       - type: dir
         path: build-aux

@@ -28,9 +28,9 @@ strategy needs `expose-pids`.
 Grant the minimum you need, per directory:
 
 ```sh
-flatpak override --user --filesystem=~/code/thisproject io.github.OWNER.ChatGPT
-flatpak override --user --show io.github.OWNER.ChatGPT     # review
-flatpak override --user --reset io.github.OWNER.ChatGPT    # start over
+flatpak override --user --filesystem=~/code/thisproject io.github.rulin132.ChatGPT
+flatpak override --user --show io.github.rulin132.ChatGPT     # review
+flatpak override --user --reset io.github.rulin132.ChatGPT    # start over
 ```
 
 The trade is real: with a sealed sandbox the agent can only run commands against

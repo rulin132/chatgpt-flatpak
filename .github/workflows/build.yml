@@ -23,7 +23,7 @@ jobs:
           dnf install -y ShellCheck || true
           shellcheck -x scripts/*.sh build-aux/apply_extra build-aux/launcher.sh
       - name: manifest lint
-        run: flatpak run --command=flatpak-builder-lint org.flatpak.Builder manifest io.github.OWNER.ChatGPT.yaml
+        run: flatpak run --command=flatpak-builder-lint org.flatpak.Builder manifest io.github.rulin132.ChatGPT.yaml
 
   build:
     needs: lint
@@ -44,8 +44,8 @@ jobs:
 
       - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
-          bundle: io.github.OWNER.ChatGPT.flatpak
-          manifest-path: io.github.OWNER.ChatGPT.yaml
+          bundle: io.github.rulin132.ChatGPT.flatpak
+          manifest-path: io.github.rulin132.ChatGPT.yaml
           arch: ${{ matrix.arch }}
           cache-key: flatpak-builder-${{ matrix.arch }}-${{ github.sha }}
           # The vendor payload is extra-data: it is fetched on the user's
@@ -59,8 +59,8 @@ jobs:
       - name: smoke test (install + apply_extra)
         if: matrix.arch == 'x86_64'
         run: |
-          flatpak install --user -y --bundle io.github.OWNER.ChatGPT.flatpak
-          flatpak run --command=cat io.github.OWNER.ChatGPT /app/extra/VERSION
-          flatpak run --command=sh io.github.OWNER.ChatGPT -c \
+          flatpak install --user -y --bundle io.github.rulin132.ChatGPT.flatpak
+          flatpak run --command=cat io.github.rulin132.ChatGPT /app/extra/VERSION
+          flatpak run --command=sh io.github.rulin132.ChatGPT -c \
             'test -f /app/extra/app.env && . /app/extra/app.env && test -x "$APP_BIN"'
           echo "apply_extra produced a runnable payload"

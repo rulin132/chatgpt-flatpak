@@ -16,17 +16,17 @@ instead. This exists for the rest of us.
 
 ```sh
 flatpak remote-add --user chatgpt https://OWNER.github.io/codex-flatpak/chatgpt.flatpakrepo
-flatpak install --user chatgpt io.github.OWNER.ChatGPT
+flatpak install --user chatgpt io.github.rulin132.ChatGPT
 ```
 
 The app **starts with no access to your files.** Grant a workspace explicitly:
 
 ```sh
-flatpak override --user --filesystem=~/code io.github.OWNER.ChatGPT
+flatpak override --user --filesystem=~/code io.github.rulin132.ChatGPT
 ```
 
 Other channels: a signed `.flatpak` bundle on each
-[release](https://github.com/OWNER/codex-flatpak/releases) for sideloading, and
+[release](https://github.com/rulin132/codex-flatpak/releases) for sideloading, and
 an OCI image at `ghcr.io/OWNER/chatgpt-flatpak` for
 `flatpak install --image docker://…` (flatpak ≥ 1.17).
 

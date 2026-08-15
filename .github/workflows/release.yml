@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'io.github.OWNER.ChatGPT.yaml'
+      - 'io.github.rulin132.ChatGPT.yaml'
       - 'build-aux/**'
   workflow_dispatch:
 
@@ -47,7 +47,7 @@ jobs:
           flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
           flatpak-builder --user --install-deps-from=flathub --force-clean \
             --disable-rofiles-fuse --disable-updates \
-            --gpg-sign="$GPG_KEY_ID" --repo=repo build io.github.OWNER.ChatGPT.yaml
+            --gpg-sign="$GPG_KEY_ID" --repo=repo build io.github.rulin132.ChatGPT.yaml
           # Static deltas matter here: archive-z2 is one HTTP request per file,
           # which is brutal against Pages.
           flatpak build-update-repo --gpg-sign="$GPG_KEY_ID" \
@@ -59,7 +59,7 @@ jobs:
         run: |
           flatpak build-bundle --gpg-sign="$GPG_KEY_ID" \
             --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo \
-            repo io.github.OWNER.ChatGPT.flatpak io.github.OWNER.ChatGPT
+            repo io.github.rulin132.ChatGPT.flatpak io.github.rulin132.ChatGPT
 
       - name: assemble Pages site
         env:
@@ -73,13 +73,13 @@ jobs:
 
       - name: read version
         id: ver
-        run: echo "v=$(sed -n 's/.*<release version="\([^"]*\)".*/\1/p' build-aux/io.github.OWNER.ChatGPT.metainfo.xml | head -n1)" >> "$GITHUB_OUTPUT"
+        run: echo "v=$(sed -n 's/.*<release version="\([^"]*\)".*/\1/p' build-aux/io.github.rulin132.ChatGPT.metainfo.xml | head -n1)" >> "$GITHUB_OUTPUT"
 
       - name: publish OCI image to GHCR
         run: |
           set -euo pipefail
           flatpak build-bundle --oci --oci-layer-compress=zstd \
-            repo oci-image io.github.OWNER.ChatGPT
+            repo oci-image io.github.rulin132.ChatGPT
           echo "${{ secrets.GITHUB_TOKEN }}" | skopeo login ghcr.io \
             -u "${{ github.actor }}" --password-stdin
           skopeo copy --format oci oci:oci-image \
@@ -90,17 +90,17 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.ver.outputs.v }}
-          files: io.github.OWNER.ChatGPT.flatpak
+          files: io.github.rulin132.ChatGPT.flatpak
           fail_on_unmatched_files: true
           body: |
             Packaging build for upstream ChatGPT ${{ steps.ver.outputs.v }}.
 
             Preferred install (auto-updates):
                 flatpak remote-add --user chatgpt https://OWNER.github.io/codex-flatpak/chatgpt.flatpakrepo
-                flatpak install --user chatgpt io.github.OWNER.ChatGPT
+                flatpak install --user chatgpt io.github.rulin132.ChatGPT
 
             Sideload (no auto-update):
-                flatpak install --user ./io.github.OWNER.ChatGPT.flatpak
+                flatpak install --user ./io.github.rulin132.ChatGPT.flatpak
 
   deploy-pages:
     needs: publish
