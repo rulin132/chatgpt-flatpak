@@ -81,9 +81,7 @@ run:
 # Kept as a tombstone so `make bundle` explains itself instead of failing with
 # "No rule to make target", and so nobody re-adds it from muscle memory.
 bundle:
-	@echo "make bundle: removed. flatpak build-bundle cannot carry an extra-data"
-	@echo "source (flatpak#1334), so the .flatpak has no application payload and"
-	@echo "installs to 'Extra data missing in detached metadata'."
+	@echo "make bundle: removed, build-bundle cannot carry extra-data (flatpak#1334)."
 	@echo "Use 'make install' locally, or the repo remote to distribute."
 	@exit 1
 

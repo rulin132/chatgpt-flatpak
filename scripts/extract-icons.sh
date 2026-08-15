@@ -20,7 +20,7 @@ DEB=$(scripts/fetch-deb.sh amd64)
 WORK=$(mktemp -d); trap 'rm -rf "$WORK"' EXIT
 
 mkdir -p "$OUT"
-deb_extract "$DEB" "$WORK" ./usr/share
+deb_cat "$DEB" "$(deb_member "$DEB" data.tar)" | tar x -C "$WORK" ./usr/share
 
 # Prefer a real hicolor icon at each size; fall back to the largest PNG shipped.
 for s in $SIZES; do

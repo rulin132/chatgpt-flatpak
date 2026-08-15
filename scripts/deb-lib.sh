@@ -20,11 +20,9 @@ deb_member() {
 # deb_cat <deb> <member>      -> that member, decompressed, on stdout
 deb_cat() {
     case "$2" in
-        *.tar)     ar p "$1" "$2" ;;
         *.tar.xz)  ar p "$1" "$2" | xz -dc ;;
         *.tar.gz)  ar p "$1" "$2" | gzip -dc ;;
         *.tar.zst) ar p "$1" "$2" | zstd -dc ;;
-        *.tar.bz2) ar p "$1" "$2" | bzip2 -dc ;;
         *) echo "deb-lib: unhandled compression for member '$2', add it here" >&2
            return 1 ;;
     esac
@@ -40,15 +38,6 @@ deb_version() {
     deb_control "$1" | sed -n 's/^Version:[[:space:]]*//p'
 }
 
-# deb_list <deb>              -> `tar tv` of the data member
-deb_list() {
-    deb_cat "$1" "$(deb_member "$1" data.tar)" | tar tv
-}
-
-# deb_extract <deb> <destdir> [tar args...]
-deb_extract() {
-    local deb=$1 dest=$2
-    shift 2
-    mkdir -p "$dest"
-    deb_cat "$deb" "$(deb_member "$deb" data.tar)" | tar x -C "$dest" "$@"
-}
+# The data member has one reader each for listing and extracting, so both do
+# `deb_cat "$deb" "$(deb_member "$deb" data.tar)" | tar ...` at the call site
+# rather than wrapping it here.
