@@ -1,0 +1,7 @@
+build/
+repo/
+public/
+oci*/
+.flatpak-builder/
+.gnupg/
+*.flatpak

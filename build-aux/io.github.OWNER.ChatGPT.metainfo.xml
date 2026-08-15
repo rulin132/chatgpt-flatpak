@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.OWNER.ChatGPT</id>
+  <name>ChatGPT</name>
+  <summary>ChatGPT, Work and Codex desktop app</summary>
+
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>LicenseRef-proprietary</project_license>
+
+  <developer id="com.openai">
+    <name>OpenAI</name>
+  </developer>
+
+  <description>
+    <p>
+      An unofficial Flatpak packaging of OpenAI's official ChatGPT desktop app
+      for Linux, which upstream ships only as .deb and .rpm. The application
+      binary is downloaded from OpenAI at install time and is not redistributed
+      by this package.
+    </p>
+    <p>
+      This packaging exists for distributions upstream does not serve: Fedora
+      atomic desktops (Silverblue, Bluefin, Bazzite, Aurora, Kinoite), openSUSE
+      Aeon/MicroOS, Arch, NixOS, Alpine and Steam Deck.
+    </p>
+    <p>
+      It ships a sealed sandbox by default: no host filesystem access and no
+      host command execution. Grant directories explicitly with
+      <code>flatpak override</code>.
+    </p>
+  </description>
+
+  <launchable type="desktop-id">io.github.OWNER.ChatGPT.desktop</launchable>
+  <url type="homepage">https://openai.com/codex/</url>
+  <url type="bugtracker">https://github.com/OWNER/codex-flatpak/issues</url>
+
+  <content_rating type="oars-1.1">
+    <content_attribute id="social-chat">intense</content_attribute>
+    <content_attribute id="social-info">intense</content_attribute>
+  </content_rating>
+
+  <requires>
+    <display_length compare="ge">768</display_length>
+  </requires>
+
+  <!-- Rewritten by scripts/sync-version.sh from the upstream .deb control file.
+       flatpak-external-data-checker will NOT bump this by itself, because the
+       rolling URL never changes. -->
+  <releases>
+    <release version="0.0.0" date="2026-08-14"/>
+  </releases>
+</component>

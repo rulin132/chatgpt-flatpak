@@ -1,0 +1,98 @@
+#!/bin/sh
+# apply_extra — runs on the USER'S machine at install time, not at build time.
+#
+# Environment (see flatpak common/flatpak-dir.c, apply_extra_data()):
+#   * cwd is /app/extra, which is the only writable path
+#   * /app and the runtime /usr are bind-mounted read-only
+#   * NO network, NO D-Bus, NO /proc, all capabilities dropped
+#   * a non-zero exit aborts the install ("apply extra script failed")
+#
+# Fail closed. A broken assumption here must break the build/install loudly,
+# never produce a half-unpacked app. This is the failure mode that bit the
+# DMG-conversion repackagers.
+set -eu
+
+DEB=chatgpt.deb
+die() { echo "apply_extra: $*" >&2; exit 1; }
+
+[ -f "$DEB" ] || die "$DEB not found in /app/extra"
+
+# --- 1. unpack the .deb ------------------------------------------------------
+if command -v bsdtar >/dev/null 2>&1; then
+    bsdtar -Oxf "$DEB" 'control.tar*' | bsdtar -xf - ./control 2>/dev/null || true
+    bsdtar -Oxf "$DEB" 'data.tar*'    | bsdtar -xf - || die "failed to extract data.tar"
+elif command -v ar >/dev/null 2>&1; then
+    ar x "$DEB" || die "ar failed on $DEB"
+    for f in control.tar.*; do [ -f "$f" ] && tar xf "$f" ./control 2>/dev/null || true; done
+    for f in data.tar.*;    do [ -f "$f" ] && { tar xf "$f" || die "failed to extract $f"; }; done
+else
+    die "neither bsdtar nor ar available in the runtime"
+fi
+
+# --- 2. record the upstream version -----------------------------------------
+# Useful for `flatpak run --command=cat ... /app/extra/VERSION` and bug reports.
+if [ -f control ]; then
+    sed -n 's/^Version:[[:space:]]*//p' control > VERSION || true
+fi
+[ -s VERSION ] || echo "unknown" > VERSION
+
+rm -f "$DEB" control control.tar.* data.tar.* debian-binary
+
+# --- 3. locate the payload without hardcoding upstream's layout --------------
+# Upstream may ship under /usr/lib/chatgpt, /opt/chatgpt, /usr/share/... — do
+# not guess. Find the Electron resources dir and work back from it.
+ASAR=$(find . -type f -name 'app.asar' -print 2>/dev/null | head -n1 || true)
+[ -n "$ASAR" ] || die "no app.asar found — upstream .deb layout changed, review scripts/inspect-deb.sh output"
+
+RESOURCES=$(dirname "$ASAR")
+APPDIR=$(dirname "$RESOURCES")
+[ "$(basename "$RESOURCES")" = "resources" ] || die "unexpected layout: app.asar not in a resources/ dir ($ASAR)"
+
+# The main binary: an ELF executable in APPDIR that is not a helper.
+APP_BIN=""
+for f in "$APPDIR"/*; do
+    [ -f "$f" ] && [ -x "$f" ] || continue
+    case "$(basename "$f")" in
+        *.so|*.so.*|*sandbox*|*crashpad*|*.pak|*.bin|*.dat|*.json) continue ;;
+    esac
+    head -c4 "$f" 2>/dev/null | grep -q 'ELF' || continue
+    APP_BIN="$f"
+    break
+done
+[ -n "$APP_BIN" ] || die "no main ELF binary found in $APPDIR"
+
+# --- 4. move payload to a stable path ---------------------------------------
+BIN_NAME=$(basename "$APP_BIN")
+mv "$APPDIR" ./app.tmp
+rm -rf ./usr ./opt ./etc ./lib ./var ./app
+mv ./app.tmp ./app
+printf 'APP_BIN=/app/extra/app/%s\n' "$BIN_NAME" > app.env
+
+# --- 5. restore the Chromium sandbox ----------------------------------------
+# Electron's SUID helper cannot work inside flatpak. zypak (from
+# org.electronjs.Electron2.BaseApp) intercepts the sandbox calls instead, and
+# stub_sandbox satisfies Chromium's presence check. This is what keeps renderer
+# processes isolated — the alternative the other repackagers chose is
+# --no-sandbox, which drops renderer isolation entirely.
+if [ -f app/chrome-sandbox ] || [ -f app/chrome_sandbox ]; then
+    install -Dm755 /app/bin/stub_sandbox app/chrome-sandbox 2>/dev/null || true
+    rm -f app/chrome_sandbox
+fi
+
+# --- 6. fix the Wayland window icon / .desktop association ------------------
+# Electron reports "{productName}.desktop"; ours is io.github.OWNER.ChatGPT.
+# Cosmetic only — warn, do not abort, if upstream changes the asar format.
+if command -v patch-electron-desktop-filename >/dev/null 2>&1; then
+    patch-electron-desktop-filename \
+        --desktop-filename io.github.OWNER.ChatGPT \
+        --skip-integrity-check app/resources/app.asar \
+        || echo "apply_extra: WARNING desktop-filename patch failed (window icon may be wrong)" >&2
+fi
+
+# --- 7. neuter any in-app updater -------------------------------------------
+# /app is read-only at runtime, so a self-updater cannot succeed — it can only
+# nag or crash. Upstream's mechanism is not yet known; add the specific patch
+# here once identified (cf. Discord's build_info.json newUpdater=false).
+# TODO(verify): inspect app/resources/ for update config after first build.
+
+echo "apply_extra: installed chatgpt $(cat VERSION) (bin=$BIN_NAME)"

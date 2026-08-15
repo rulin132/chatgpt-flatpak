@@ -1,0 +1,113 @@
+name: release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'io.github.OWNER.ChatGPT.yaml'
+      - 'build-aux/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+
+      # GPG signing is not optional: flatpak refuses system-wide installs of
+      # extra-data apps from a source that is not gpg-verified.
+      - name: import signing key
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          export GNUPGHOME=$PWD/.gnupg
+          mkdir -p -m700 "$GNUPGHOME"
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+          echo "GNUPGHOME=$GNUPGHOME" >> "$GITHUB_ENV"
+
+      - name: build + sign repo
+        env:
+          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+        run: |
+          set -euo pipefail
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak-builder --user --install-deps-from=flathub --force-clean \
+            --disable-rofiles-fuse --disable-updates \
+            --gpg-sign="$GPG_KEY_ID" --repo=repo build io.github.OWNER.ChatGPT.yaml
+          # Static deltas matter here: archive-z2 is one HTTP request per file,
+          # which is brutal against Pages.
+          flatpak build-update-repo --gpg-sign="$GPG_KEY_ID" \
+            --generate-static-deltas --prune repo/
+
+      - name: build sideload bundle
+        env:
+          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+        run: |
+          flatpak build-bundle --gpg-sign="$GPG_KEY_ID" \
+            --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo \
+            repo io.github.OWNER.ChatGPT.flatpak io.github.OWNER.ChatGPT
+
+      - name: assemble Pages site
+        env:
+          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+          PAGES_URL: https://OWNER.github.io/codex-flatpak
+        run: ./scripts/publish-pages.sh
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - name: read version
+        id: ver
+        run: echo "v=$(sed -n 's/.*<release version="\([^"]*\)".*/\1/p' build-aux/io.github.OWNER.ChatGPT.metainfo.xml | head -n1)" >> "$GITHUB_OUTPUT"
+
+      - name: publish OCI image to GHCR
+        run: |
+          set -euo pipefail
+          flatpak build-bundle --oci --oci-layer-compress=zstd \
+            repo oci-image io.github.OWNER.ChatGPT
+          echo "${{ secrets.GITHUB_TOKEN }}" | skopeo login ghcr.io \
+            -u "${{ github.actor }}" --password-stdin
+          skopeo copy --format oci oci:oci-image \
+            "docker://ghcr.io/${{ github.repository_owner }}/chatgpt-flatpak:${{ steps.ver.outputs.v }}"
+          skopeo copy --format oci oci:oci-image \
+            "docker://ghcr.io/${{ github.repository_owner }}/chatgpt-flatpak:latest"
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.v }}
+          files: io.github.OWNER.ChatGPT.flatpak
+          fail_on_unmatched_files: true
+          body: |
+            Packaging build for upstream ChatGPT ${{ steps.ver.outputs.v }}.
+
+            Preferred install (auto-updates):
+                flatpak remote-add --user chatgpt https://OWNER.github.io/codex-flatpak/chatgpt.flatpakrepo
+                flatpak install --user chatgpt io.github.OWNER.ChatGPT
+
+            Sideload (no auto-update):
+                flatpak install --user ./io.github.OWNER.ChatGPT.flatpak
+
+  deploy-pages:
+    needs: publish
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,74 @@
+name: update-check
+
+# Upstream publishes to a rolling "latest" URL with no version in the path, so
+# the bytes behind our pinned sha256 rotate without warning. When that happens
+# every NEW install fails with "Invalid checksum for extra data".
+#
+# flatpak-external-data-checker's URLChecker runs against every extra-data
+# source, and for .deb payloads it downloads the file and reads Version: out of
+# the control archive. So it detects the rotation, marks the source BROKEN, and
+# rewrites sha256 + size for us. This is the piece every other repackager does
+# by hand (AUR) or by rebuilding on each user's machine (the DMG converters).
+
+on:
+  schedule:
+    - cron: '17 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Scheduled workflows are disabled after 60 days of repo inactivity.
+      # An unattended update bot that silently stops is worse than no bot.
+      - name: keep schedule armed
+        uses: gautamkrishnar/keepalive-workflow@v2
+        with:
+          use_api: true
+
+      - name: check upstream
+        uses: docker://ghcr.io/flathub/flatpak-external-data-checker:latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: --update --commit-only --never-fork io.github.OWNER.ChatGPT.yaml
+
+      - name: sync AppStream version
+        run: |
+          set -euo pipefail
+          # f-e-d-c decides "version changed" by comparing URLs, and ours never
+          # changes — so it will not touch metainfo. Do it explicitly.
+          url=https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_amd64.deb
+          curl -fsSL -o /tmp/chatgpt.deb "$url"
+          ver=$(dpkg-deb -f /tmp/chatgpt.deb Version)
+          ./scripts/sync-version.sh "$ver"
+          if ! git diff --quiet; then
+            git config user.name  "update-bot"
+            git config user.email "noreply@github.com"
+            git commit -am "metainfo: record upstream $ver"
+          fi
+
+      - name: open PR
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: chore/upstream-refresh
+          delete-branch: true
+          title: 'chore: refresh upstream payload'
+          labels: automated
+          body: |
+            Automated by flatpak-external-data-checker.
+
+            Upstream rotated the bytes behind the rolling `latest/` URL.
+            `sha256` and `size` have been re-pinned and the AppStream release
+            entry updated from the .deb control file.
+
+            **Merging is not a rubber stamp.** CI re-runs `apply_extra` against
+            the new payload via the smoke-test job — if upstream moved
+            `app.asar` or renamed the binary, that job fails and this PR should
+            not be merged until `scripts/inspect-deb.sh` says why.

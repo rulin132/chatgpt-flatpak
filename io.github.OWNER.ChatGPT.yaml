@@ -1,0 +1,98 @@
+app-id: io.github.OWNER.ChatGPT
+runtime: org.freedesktop.Platform
+runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
+base: org.electronjs.Electron2.BaseApp
+base-version: '25.08'
+command: chatgpt-launcher
+separate-locales: false
+tags:
+  - proprietary
+
+# ---------------------------------------------------------------------------
+# SEALED SANDBOX (default posture — see docs/SECURITY.md)
+#
+# Deliberately absent:
+#   --filesystem=host                     the app sees NO user files by default
+#   --talk-name=org.freedesktop.Flatpak   no flatpak-spawn --host = no host escape
+#
+# Grant a workspace explicitly, per-user, per-directory:
+#   flatpak override --user --filesystem=~/code io.github.OWNER.ChatGPT
+# ---------------------------------------------------------------------------
+finish-args:
+  # zypak's spawn strategy needs expose-pids/SpawnStarted (flatpak >= 1.8.2).
+  - --require-version=1.8.2
+  - --share=ipc
+  - --share=network
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --socket=pulseaudio
+  - --device=dri
+  # Credential storage via Secret Service / KWallet.
+  - --talk-name=org.freedesktop.secrets
+  - --talk-name=org.kde.kwalletd5
+  - --talk-name=org.kde.kwalletd6
+  # Tray icon (StatusNotifierItem only; GNOME additionally needs a shell ext).
+  - --talk-name=org.kde.StatusNotifierWatcher
+  # Notifications go through the portal — no talk-name needed since BaseApp 23.08.
+  - --env=ELECTRON_TRASH=gio
+  - --env=XCURSOR_PATH=/run/host/user-share/icons:/run/host/share/icons
+
+cleanup:
+  - /include
+  - /lib/pkgconfig
+  - /share/man
+
+modules:
+  - name: chatgpt
+    buildsystem: simple
+    build-commands:
+      # Install-time unpacker and launcher.
+      - install -Dm755 apply_extra /app/bin/apply_extra
+      - install -Dm755 launcher.sh /app/bin/chatgpt-launcher
+      # AppStream/desktop metadata MUST be installed at build time: the store
+      # index has to exist before any extra-data is downloaded.
+      - install -Dm644 io.github.OWNER.ChatGPT.desktop
+        /app/share/applications/io.github.OWNER.ChatGPT.desktop
+      - install -Dm644 io.github.OWNER.ChatGPT.metainfo.xml
+        /app/share/metainfo/io.github.OWNER.ChatGPT.metainfo.xml
+      - for s in 16 32 48 64 128 256 512; do install -Dm644 "icons/$s.png"
+        "/app/share/icons/hicolor/${s}x${s}/apps/io.github.OWNER.ChatGPT.png"; done
+    sources:
+      - type: dir
+        path: build-aux
+
+      # -- Vendor payload -----------------------------------------------------
+      # extra-data is downloaded on the USER'S machine at install time. We never
+      # host or redistribute OpenAI's bytes. sha256 + size are MANDATORY and are
+      # verified before apply_extra runs.
+      #
+      # The URL is a rolling "latest" alias with no version in the path. The
+      # flatpak-external-data-checker URLChecker runs against every extra-data
+      # source, and for .deb payloads it reads Version: out of the control
+      # archive — so the nightly job detects rotated bytes, marks the source
+      # BROKEN, and rewrites sha256/size automatically. See update-check.yml.
+      #
+      # Run `make hashes` to populate these for the first time.
+      - type: extra-data
+        filename: chatgpt.deb
+        only-arches:
+          - x86_64
+        url: https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_amd64.deb
+        sha256: 0000000000000000000000000000000000000000000000000000000000000000
+        size: 0
+        x-checker-data:
+          type: rotating-url
+          url: https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_amd64.deb
+          is-main-source: true
+
+      - type: extra-data
+        filename: chatgpt.deb
+        only-arches:
+          - aarch64
+        url: https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_arm64.deb
+        sha256: 0000000000000000000000000000000000000000000000000000000000000000
+        size: 0
+        x-checker-data:
+          type: rotating-url
+          url: https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_arm64.deb

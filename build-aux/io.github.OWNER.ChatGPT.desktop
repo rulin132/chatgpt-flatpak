@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=ChatGPT
+GenericName=AI Assistant
+Comment=ChatGPT, Work and Codex desktop app
+Exec=chatgpt-launcher %U
+Icon=io.github.OWNER.ChatGPT
+Terminal=false
+StartupWMClass=ChatGPT
+Categories=Network;Development;Utility;
+Keywords=chatgpt;openai;codex;ai;assistant;
+MimeType=x-scheme-handler/chatgpt;
