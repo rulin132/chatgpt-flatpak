@@ -23,8 +23,14 @@ if command -v bsdtar >/dev/null 2>&1; then
     bsdtar -Oxf "$DEB" 'data.tar*'    | bsdtar -xf - || die "failed to extract data.tar"
 elif command -v ar >/dev/null 2>&1; then
     ar x "$DEB" || die "ar failed on $DEB"
-    for f in control.tar.*; do [ -f "$f" ] && tar xf "$f" ./control 2>/dev/null || true; done
-    for f in data.tar.*;    do [ -f "$f" ] && { tar xf "$f" || die "failed to extract $f"; }; done
+    for f in control.tar.*; do
+        [ -f "$f" ] || continue
+        tar xf "$f" ./control 2>/dev/null || true
+    done
+    for f in data.tar.*; do
+        [ -f "$f" ] || continue
+        tar xf "$f" || die "failed to extract $f"
+    done
 else
     die "neither bsdtar nor ar available in the runtime"
 fi
@@ -51,7 +57,8 @@ APPDIR=$(dirname "$RESOURCES")
 # The main binary: an ELF executable in APPDIR that is not a helper.
 APP_BIN=""
 for f in "$APPDIR"/*; do
-    [ -f "$f" ] && [ -x "$f" ] || continue
+    [ -f "$f" ] || continue
+    [ -x "$f" ] || continue
     case "$(basename "$f")" in
         *.so|*.so.*|*sandbox*|*crashpad*|*.pak|*.bin|*.dat|*.json) continue ;;
     esac

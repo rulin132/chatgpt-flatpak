@@ -19,6 +19,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Print the version: the runner's shellcheck is older than a typical local
+      # one and still reports SC2015 for `A && B || C`, which newer releases do
+      # not. Without this line a green local run and a red CI run look identical.
+      - run: shellcheck --version
       - run: shellcheck -x scripts/*.sh tests/*.sh build-aux/apply_extra build-aux/launcher.sh
       - run: tests/test-sync-version.sh
 
