@@ -2,7 +2,7 @@ MIT License
 
 Copyright (c) 2026 the codex-flatpak contributors
 
-This licence applies ONLY to the packaging in this repository — the flatpak
+This licence applies ONLY to the packaging in this repository: the flatpak
 manifest, scripts, workflows, desktop entry and AppStream metadata. It grants no
 rights whatsoever to OpenAI software, services, trademarks or content. The
 ChatGPT application binary is downloaded from OpenAI by the end user at install

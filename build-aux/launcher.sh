@@ -4,7 +4,8 @@
 # web content inherit every permission this flatpak holds.
 set -eu
 
-[ -f /app/extra/app.env ] || { echo "chatgpt: app.env missing — reinstall the flatpak" >&2; exit 1; }
+[ -f /app/extra/app.env ] || { echo "chatgpt: app.env missing, reinstall the flatpak" >&2; exit 1; }
+# shellcheck source=/dev/null  # written by apply_extra at install time
 . /app/extra/app.env
 
 # Electron writes scratch data next to $TMPDIR; keep it inside the per-app dir.

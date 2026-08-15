@@ -43,7 +43,7 @@ jobs:
         run: |
           set -euo pipefail
           # f-e-d-c decides "version changed" by comparing URLs, and ours never
-          # changes — so it will not touch metainfo. Do it explicitly.
+          # changes, so it will not touch metainfo. Do it explicitly.
           url=https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_amd64.deb
           curl -fsSL -o /tmp/chatgpt.deb "$url"
           ver=$(dpkg-deb -f /tmp/chatgpt.deb Version)
@@ -69,6 +69,6 @@ jobs:
             entry updated from the .deb control file.
 
             **Merging is not a rubber stamp.** CI re-runs `apply_extra` against
-            the new payload via the smoke-test job — if upstream moved
+            the new payload via the smoke-test job. If upstream moved
             `app.asar` or renamed the binary, that job fails and this PR should
             not be merged until `scripts/inspect-deb.sh` says why.
