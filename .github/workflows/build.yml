@@ -53,7 +53,10 @@ jobs:
             flatpak install --user -y flathub org.flatpak.Builder
             lint() { flatpak run --command=flatpak-builder-lint org.flatpak.Builder "$@"; }
           fi
-          lint manifest io.github.rulin132.ChatGPT.yaml
+          # --exceptions switches the mechanism on. --user-exceptions on its own
+          # is silently inert: the whole exceptions block is gated on the former.
+          lint --exceptions --user-exceptions flatpak-builder-lint-exceptions.json \
+               manifest io.github.rulin132.ChatGPT.yaml
 
   # Deliberately does NOT depend on lint or shellcheck. The smoke test below is
   # the only thing that catches upstream layout drift before it reaches users,

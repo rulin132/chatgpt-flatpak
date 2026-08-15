@@ -3,6 +3,9 @@ MANIFEST := $(APP_ID).yaml
 REPO     ?= repo
 BUILDDIR ?= build
 LOCAL_REMOTE ?= $(APP_ID)-local
+# --exceptions is what switches the mechanism on at all; --user-exceptions
+# alone is silently inert. CI uses the same pair, so local and CI agree.
+LINT_EXCEPTIONS := flatpak-builder-lint-exceptions.json
 GPG_KEY  ?=
 GPG_ARGS := $(if $(GPG_KEY),--gpg-sign=$(GPG_KEY),)
 
@@ -52,7 +55,8 @@ inspect:
 	scripts/inspect-deb.sh
 
 lint:
-	flatpak run --command=flatpak-builder-lint org.flatpak.Builder manifest $(MANIFEST)
+	flatpak run --command=flatpak-builder-lint org.flatpak.Builder \
+	  --exceptions --user-exceptions $(LINT_EXCEPTIONS) manifest $(MANIFEST)
 
 build:
 	$(FB) --user --install-deps-from=flathub --force-clean \

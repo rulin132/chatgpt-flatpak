@@ -1,0 +1,5 @@
+{
+  "io.github.rulin132.ChatGPT": {
+    "appid-url-not-reachable": "The linter expects io.github.X.Y to resolve to github.com/X/Y. This repo is codex-flatpak, so the check looks up github.com/rulin132/chatgpt and gets a 404. Nothing about the packaging is wrong. It disappears when the app id is settled, either by renaming the repo to match or by moving to a domain-based id, which is deliberately still open. Every other lint error stays fatal."
+  }
+}
