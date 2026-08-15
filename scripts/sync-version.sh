@@ -10,7 +10,8 @@ set -euo pipefail
 
 VER=${1:?usage: sync-version.sh <version> [date]}
 DATE=${2:-$(date -u +%Y-%m-%d)}
-XML=$(ls build-aux/*.metainfo.xml | head -n1)
+xmls=(build-aux/*.metainfo.xml)
+XML=${xmls[0]}
 
 python3 - "$XML" "$VER" "$DATE" <<'PY'
 import re, sys

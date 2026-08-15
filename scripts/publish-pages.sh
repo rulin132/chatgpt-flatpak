@@ -5,7 +5,10 @@ set -euo pipefail
 
 : "${GPG_KEY_ID:?set GPG_KEY_ID}"
 PAGES_URL=${PAGES_URL:?set PAGES_URL, e.g. https://OWNER.github.io/codex-flatpak}
-APP_ID=${APP_ID:-$(ls ./*.ChatGPT.yaml | head -n1 | sed 's/\.yaml$//')}
+# basename, not `ls | sed`: the old form left the glob's "./" on the front, so
+# the .flatpakref shipped Name=./io.github.rulin132.ChatGPT.
+manifests=(./*.ChatGPT.yaml)
+APP_ID=${APP_ID:-$(basename "${manifests[0]}" .yaml)}
 
 rm -rf public && mkdir -p public
 cp -a repo public/repo
@@ -40,10 +43,10 @@ cp build-aux/icons/256.png public/icon.png
 
 cat > public/index.html <<EOF
 <!doctype html><meta charset=utf-8>
-<title>ChatGPT — unofficial Flatpak</title>
+<title>ChatGPT (unofficial Flatpak)</title>
 <style>body{font:16px/1.6 system-ui;max-width:46rem;margin:4rem auto;padding:0 1rem}
 pre{background:#f4f4f5;padding:.8rem;border-radius:6px;overflow-x:auto}</style>
-<h1>ChatGPT desktop — unofficial Flatpak</h1>
+<h1>ChatGPT desktop (unofficial Flatpak)</h1>
 <p>For distributions OpenAI does not ship packages for: Fedora atomic
 (Silverblue, Bluefin, Bazzite, Aurora, Kinoite), openSUSE Aeon/MicroOS, Arch,
 NixOS, Alpine, Steam Deck.</p>
