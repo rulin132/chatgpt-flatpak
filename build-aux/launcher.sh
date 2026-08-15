@@ -17,7 +17,14 @@ mkdir -p "$TMPDIR"
 set -- --ozone-platform-hint=auto --enable-wayland-ime "$@"
 
 # Opt-in escape hatches, off by default (see docs/SECURITY.md):
-#   CHATGPT_DISABLE_GPU=1   drop hardware acceleration if you hit a blank window
-[ "${CHATGPT_DISABLE_GPU:-0}" = "1" ] && set -- --disable-gpu "$@"
+#   CHATGPT_DISABLE_GPU=1   render in software if you hit a blank window
+#
+# Not --disable-gpu. That leaves Chromium with no rasteriser at all here, so it
+# aborts with "GPU access not allowed. Reason: GPU access is disabled through
+# commandline switch --disable-gpu and --disable-software-rasterizer" and no
+# window ever appears, which is worse than the blank window it was meant to fix.
+# Routing ANGLE at the bundled SwiftShader drops the driver but keeps rendering.
+# Measured on 26.810.52044: --disable-gpu gives 0 windows, this gives 2.
+[ "${CHATGPT_DISABLE_GPU:-0}" = "1" ] && set -- --use-angle=swiftshader "$@"
 
 exec zypak-wrapper "$APP_BIN" "$@"
