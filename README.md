@@ -1,7 +1,7 @@
-# ChatGPT / Codex desktop — unofficial Flatpak
+# ChatGPT / Codex desktop (unofficial Flatpak)
 
 OpenAI ships the Linux desktop app as `.deb` and `.rpm` only. That covers Ubuntu,
-Debian and traditional Fedora — and leaves out everything else. This repo packages
+Debian and traditional Fedora, and leaves out everything else. This repo packages
 the **official** Linux build as a Flatpak for the distributions upstream doesn't
 serve:
 
@@ -25,10 +25,19 @@ The app **starts with no access to your files.** Grant a workspace explicitly:
 flatpak override --user --filesystem=~/code io.github.rulin132.ChatGPT
 ```
 
-Other channels: a signed `.flatpak` bundle on each
-[release](https://github.com/rulin132/codex-flatpak/releases) for sideloading, and
-an OCI image at `ghcr.io/OWNER/chatgpt-flatpak` for
-`flatpak install --image docker://…` (flatpak ≥ 1.17).
+Also available as an OCI image at `ghcr.io/OWNER/chatgpt-flatpak`, which needs
+flatpak 1.17 or newer:
+
+```sh
+flatpak install --user --image docker://ghcr.io/OWNER/chatgpt-flatpak:latest
+```
+
+There is no `.flatpak` sideload bundle. `flatpak build-bundle` cannot carry an
+`extra-data` source ([flatpak#1334](https://github.com/flatpak/flatpak/issues/1334),
+open since 2018), so the bundle installs with no application in it. The OCI
+image does not have this problem: it keeps the extra-data source as an image
+label rather than in detached metadata. Verified on flatpak 1.18.0 by installing
+a locally built image with no other remote configured.
 
 ## How this differs from the other repackagers
 
@@ -45,14 +54,14 @@ an OCI image at `ghcr.io/OWNER/chatgpt-flatpak` for
 ## Maintaining it
 
 ```sh
-make rename GH_USER=<you>   # do this first — sets the app-id everywhere
+make rename GH_USER=<you>   # do this first, sets the app-id everywhere
 make deps                   # runtimes, SDK, Electron BaseApp, linter
 make hashes                 # pin sha256 + size from upstream, sync version
 make icons                  # replace placeholder icons with the real ones
 make install && make run
 ```
 
-Then set three repository secrets — `GPG_PRIVATE_KEY`, `GPG_KEY_ID`,
+Then set two repository secrets, `GPG_PRIVATE_KEY` and `GPG_KEY_ID`,
 and enable Pages (source: GitHub Actions).
 
 ### The update problem, and how it's solved
@@ -84,7 +93,7 @@ fails and `scripts/inspect-deb.sh` tells you what changed.
 scripts/inspect-deb.sh           # dump the upstream .deb layout
 ```
 
-`apply_extra` deliberately fails closed — it locates `app.asar` and the main
+`apply_extra` deliberately fails closed. It locates `app.asar` and the main
 ELF binary at install time rather than hardcoding upstream's paths, and aborts
 with a specific message rather than producing a half-unpacked app.
 
@@ -93,14 +102,14 @@ with a specific message rather than producing a half-unpacked app.
 Sealed by default: **no** `--filesystem=host`, **no**
 `--talk-name=org.freedesktop.Flatpak`. The app cannot read your home directory
 or execute commands on the host until you grant it. Read
-[docs/SECURITY.md](docs/SECURITY.md) before widening that — particularly the
+[docs/SECURITY.md](docs/SECURITY.md) before widening that, particularly the
 part about why this is not a trust boundary you should put client work behind.
 
 ## Legal
 
 The `extra-data` source type means the vendor binary is downloaded from OpenAI
 by *your* machine at install time. This repository hosts no OpenAI software and
-redistributes none. The MIT licence covers the packaging — manifest, scripts,
-metadata — and grants no rights to OpenAI software or services. Not affiliated
+redistributes none. The MIT licence covers the packaging (manifest, scripts,
+metadata) and grants no rights to OpenAI software or services. Not affiliated
 with OpenAI. You need your own ChatGPT account and must comply with OpenAI's
 terms.

@@ -1,11 +1,12 @@
 name: release
 
+# Tag or manual dispatch ONLY. This previously fired on every push to main that
+# touched the manifest or build-aux/, which is most packaging work: the first
+# such merge would have published, permanently fixing the app id and remote URL
+# for everyone who installed from it. Publishing is a deliberate act.
 on:
   push:
-    branches: [main]
-    paths:
-      - 'io.github.rulin132.ChatGPT.yaml'
-      - 'build-aux/**'
+    tags: ['v*']
   workflow_dispatch:
 
 permissions:
@@ -53,13 +54,10 @@ jobs:
           flatpak build-update-repo --gpg-sign="$GPG_KEY_ID" \
             --generate-static-deltas --prune repo/
 
-      - name: build sideload bundle
-        env:
-          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
-        run: |
-          flatpak build-bundle --gpg-sign="$GPG_KEY_ID" \
-            --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo \
-            repo io.github.rulin132.ChatGPT.flatpak io.github.rulin132.ChatGPT
+      # No sideload bundle. `flatpak build-bundle` cannot carry an extra-data
+      # source (flatpak#1334, open since 2018), so the .flatpak it produces has
+      # no application payload and installs to "Extra data missing in detached
+      # metadata". Shipping one would hand users a file that cannot work.
 
       - name: assemble Pages site
         env:
@@ -87,20 +85,17 @@ jobs:
           skopeo copy --format oci oci:oci-image \
             "docker://ghcr.io/${{ github.repository_owner }}/chatgpt-flatpak:latest"
 
+      # No files: attached. The release is a marker pointing at the repo remote;
+      # see the bundle note above for why there is nothing to upload.
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.ver.outputs.v }}
-          files: io.github.rulin132.ChatGPT.flatpak
-          fail_on_unmatched_files: true
           body: |
             Packaging build for upstream ChatGPT ${{ steps.ver.outputs.v }}.
 
-            Preferred install (auto-updates):
+            Install:
                 flatpak remote-add --user chatgpt https://OWNER.github.io/codex-flatpak/chatgpt.flatpakrepo
                 flatpak install --user chatgpt io.github.rulin132.ChatGPT
-
-            Sideload (no auto-update):
-                flatpak install --user ./io.github.rulin132.ChatGPT.flatpak
 
   deploy-pages:
     needs: publish
