@@ -1,5 +1,5 @@
 #!/bin/sh
-# apply_extra — runs on the USER'S machine at install time, not at build time.
+# apply_extra: runs on the USER'S machine at install time, not at build time.
 #
 # Environment (see flatpak common/flatpak-dir.c, apply_extra_data()):
 #   * cwd is /app/extra, which is the only writable path
@@ -36,13 +36,13 @@ if [ -f control ]; then
 fi
 [ -s VERSION ] || echo "unknown" > VERSION
 
-rm -f "$DEB" control control.tar.* data.tar.* debian-binary
+rm -f "$DEB" control control.tar.* data.tar.* debian-binary _gpgorigin
 
 # --- 3. locate the payload without hardcoding upstream's layout --------------
-# Upstream may ship under /usr/lib/chatgpt, /opt/chatgpt, /usr/share/... — do
+# Upstream may ship under /usr/lib/chatgpt, /opt/chatgpt, /usr/share/..., so do
 # not guess. Find the Electron resources dir and work back from it.
 ASAR=$(find . -type f -name 'app.asar' -print 2>/dev/null | head -n1 || true)
-[ -n "$ASAR" ] || die "no app.asar found — upstream .deb layout changed, review scripts/inspect-deb.sh output"
+[ -n "$ASAR" ] || die "no app.asar found, upstream .deb layout changed, review scripts/inspect-deb.sh output"
 
 RESOURCES=$(dirname "$ASAR")
 APPDIR=$(dirname "$RESOURCES")
@@ -68,20 +68,33 @@ rm -rf ./usr ./opt ./etc ./lib ./var ./app
 mv ./app.tmp ./app
 printf 'APP_BIN=/app/extra/app/%s\n' "$BIN_NAME" > app.env
 
-# --- 5. restore the Chromium sandbox ----------------------------------------
+# --- 5. check the Chromium sandbox ------------------------------------------
 # Electron's SUID helper cannot work inside flatpak. zypak (from
-# org.electronjs.Electron2.BaseApp) intercepts the sandbox calls instead, and
-# stub_sandbox satisfies Chromium's presence check. This is what keeps renderer
-# processes isolated — the alternative the other repackagers chose is
+# org.electronjs.Electron2.BaseApp) intercepts the sandbox calls instead and
+# runs each renderer in a nested flatpak sub-sandbox. That is what keeps
+# renderer processes isolated. The alternative the other repackagers chose is
 # --no-sandbox, which drops renderer isolation entirely.
-if [ -f app/chrome-sandbox ] || [ -f app/chrome_sandbox ]; then
-    install -Dm755 /app/bin/stub_sandbox app/chrome-sandbox 2>/dev/null || true
-    rm -f app/chrome_sandbox
+#
+# Upstream ships no chrome-sandbox: on the .deb it relies on unprivileged user
+# namespaces (hence its /etc/apparmor.d/chatgpt profile), which are not
+# available to us inside bubblewrap. Nothing needs to be stubbed out, because zypak
+# takes over before Chromium looks for a helper. Verified on 26.810.50856: the
+# zygote runs under `bwrap ... zypak-helper child`.
+#
+# So this step asserts rather than installs. Both branches are load-bearing:
+# without zypak the launcher cannot isolate anything, and a chrome-sandbox
+# appearing upstream means the sandbox model changed and a human has to decide
+# what that means before we ship it.
+[ -x /app/bin/zypak-wrapper ] \
+    || die "zypak-wrapper missing from the Electron BaseApp, refusing to install an app whose renderers would be unsandboxed"
+
+if [ -e app/chrome-sandbox ] || [ -e app/chrome_sandbox ]; then
+    die "upstream now ships a chrome-sandbox helper, its sandbox model changed; review before shipping (see docs/SECURITY.md)"
 fi
 
 # --- 6. fix the Wayland window icon / .desktop association ------------------
 # Electron reports "{productName}.desktop"; ours is io.github.rulin132.ChatGPT.
-# Cosmetic only — warn, do not abort, if upstream changes the asar format.
+# Cosmetic only: warn, do not abort, if upstream changes the asar format.
 if command -v patch-electron-desktop-filename >/dev/null 2>&1; then
     patch-electron-desktop-filename \
         --desktop-filename io.github.rulin132.ChatGPT \
@@ -89,10 +102,13 @@ if command -v patch-electron-desktop-filename >/dev/null 2>&1; then
         || echo "apply_extra: WARNING desktop-filename patch failed (window icon may be wrong)" >&2
 fi
 
-# --- 7. neuter any in-app updater -------------------------------------------
-# /app is read-only at runtime, so a self-updater cannot succeed — it can only
-# nag or crash. Upstream's mechanism is not yet known; add the specific patch
-# here once identified (cf. Discord's build_info.json newUpdater=false).
-# TODO(verify): inspect app/resources/ for update config after first build.
+# --- 7. in-app updater ------------------------------------------------------
+# Checked against 26.810.50856: the app logs `enableSparkle=false
+# enableUpdater=true` at startup but never tries to write to /app. There is no
+# Squirrel or AppImage updater in the payload. Nothing to neuter here.
+#
+# What it does do is download a "primary runtime" bundle into $HOME on first
+# launch. That is a separate mechanism, it lands in the app's own data, and it
+# is not this script's business.
 
 echo "apply_extra: installed chatgpt $(cat VERSION) (bin=$BIN_NAME)"
