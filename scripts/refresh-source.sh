@@ -5,22 +5,23 @@
 # Usage: scripts/refresh-source.sh [manifest.yaml]
 set -euo pipefail
 
-MANIFEST=${1:-$(ls ./*.ChatGPT.yaml | head -n1)}
-WORK=$(mktemp -d)
-trap 'rm -rf "$WORK"' EXIT
+cd "$(dirname "$0")/.."
+# shellcheck source=scripts/deb-lib.sh
+. scripts/deb-lib.sh
 
-declare -A URLS=(
-  [x86_64]="https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_amd64.deb"
-  [aarch64]="https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_arm64.deb"
-)
+manifests=(./*.ChatGPT.yaml)
+MANIFEST=${1:-${manifests[0]}}
 
-for arch in "${!URLS[@]}"; do
-  url=${URLS[$arch]}
-  echo ">> fetching $arch"
-  curl -fsSL --retry 3 -o "$WORK/$arch.deb" "$url"
+declare -A ARCHES=([x86_64]=amd64 [aarch64]=arm64)
+declare -A DEBS=()
 
-  sha=$(sha256sum "$WORK/$arch.deb" | cut -d' ' -f1)
-  size=$(stat -c%s "$WORK/$arch.deb")
+for arch in "${!ARCHES[@]}"; do
+  deb=$(scripts/fetch-deb.sh "${ARCHES[$arch]}")
+  DEBS[$arch]=$deb
+  url="https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_${ARCHES[$arch]}.deb"
+
+  sha=$(sha256sum "$deb" | cut -d' ' -f1)
+  size=$(stat -c%s "$deb")
   echo "   sha256=$sha size=$size"
 
   python3 - "$MANIFEST" "$url" "$sha" "$size" <<'PY'
@@ -45,9 +46,8 @@ PY
 done
 
 # Version comes from the x86_64 control file; keep metainfo in step.
-VER=$(dpkg-deb -f "$WORK/x86_64.deb" Version 2>/dev/null \
-      || { ar p "$WORK/x86_64.deb" control.tar.gz | tar xzO ./control \
-           | sed -n 's/^Version:[[:space:]]*//p'; })
+VER=$(deb_version "${DEBS[x86_64]}")
+[ -n "$VER" ] || { echo "refresh-source: no Version: in the control file" >&2; exit 1; }
 echo ">> upstream version: $VER"
 scripts/sync-version.sh "$VER"
 

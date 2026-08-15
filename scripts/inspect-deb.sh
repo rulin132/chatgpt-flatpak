@@ -1,31 +1,44 @@
 #!/usr/bin/env bash
 # Dump the upstream .deb layout. Run this whenever a build starts failing in
-# apply_extra — it tells you what actually changed.
+# apply_extra. It tells you what actually changed.
 #
 # Usage: scripts/inspect-deb.sh [amd64|arm64]
 set -euo pipefail
 
-ARCH=${1:-amd64}
-URL="https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_${ARCH}.deb"
-WORK=$(mktemp -d); trap 'rm -rf "$WORK"' EXIT
+cd "$(dirname "$0")/.."
+# shellcheck source=scripts/deb-lib.sh
+. scripts/deb-lib.sh
 
-curl -fsSL -o "$WORK/pkg.deb" "$URL"
+DEB=$(scripts/fetch-deb.sh "${1:-amd64}")
+LIST=$(deb_list "$DEB")
 
+echo "=== ar members ================================================"
+ar t "$DEB"
+
+echo
 echo "=== control ==================================================="
-dpkg-deb -I "$WORK/pkg.deb" 2>/dev/null || ar p "$WORK/pkg.deb" control.tar.gz | tar xzO ./control
+deb_control "$DEB"
 
 echo
 echo "=== top-level payload dirs ===================================="
-dpkg-deb -c "$WORK/pkg.deb" | awk '{print $6}' | cut -d/ -f2-3 | sort -u | head -40
+awk '{print $NF}' <<<"$LIST" | cut -d/ -f2-3 | sort -u | head -40
 
 echo
 echo "=== app.asar / main binary candidates ========================="
-dpkg-deb -c "$WORK/pkg.deb" | grep -E 'app\.asar|chrome-sandbox|/chatgpt$|\.desktop$|icons/.*\.png$' || true
+grep -E 'app\.asar|chrome[-_]sandbox|\.desktop$|pixmaps/|icons/.*\.png$' <<<"$LIST" || true
+
+echo
+echo "=== executables next to app.asar =============================="
+# apply_extra picks the first ELF here that is not a helper. If upstream adds
+# another top-level executable, this is where you will see it.
+appdir=$(grep -m1 'app\.asar$' <<<"$LIST" | awk '{print $NF}' | xargs dirname | xargs dirname)
+grep -E "^-.{8}x.* ${appdir}/[^/]+$" <<<"$LIST" || echo "(none, apply_extra will fail closed)"
 
 echo
 echo "=== anything that smells like a self-updater =================="
-dpkg-deb -c "$WORK/pkg.deb" | grep -Ei 'update|appimage|squirrel' || echo "(none obvious)"
+awk '{print $NF}' <<<"$LIST" | grep -vE '/(node_modules|cua_node)/' \
+  | grep -Ei 'update|appimage|squirrel' || echo "(none obvious)"
 
 echo
 echo "=== maintainer scripts (these add OpenAI's apt repo) =========="
-dpkg-deb --ctrl-tarfile "$WORK/pkg.deb" | tar t 2>/dev/null || true
+deb_cat "$DEB" "$(deb_member "$DEB" control.tar)" | tar t
