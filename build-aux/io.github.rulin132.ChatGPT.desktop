@@ -9,4 +9,4 @@ Terminal=false
 StartupWMClass=ChatGPT
 Categories=Network;Development;Utility;
 Keywords=chatgpt;openai;codex;ai;assistant;
-MimeType=x-scheme-handler/chatgpt;
+MimeType=x-scheme-handler/codex;
