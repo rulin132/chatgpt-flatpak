@@ -1,106 +1,156 @@
-# ChatGPT / Codex desktop — unofficial Flatpak
+# ChatGPT / Codex Desktop Flatpak
 
-OpenAI ships the Linux desktop app as `.deb` and `.rpm` only. That covers Ubuntu,
-Debian and traditional Fedora — and leaves out everything else. This repo packages
-the **official** Linux build as a Flatpak for the distributions upstream doesn't
-serve:
-
-Fedora atomic (Silverblue, Bluefin, Bazzite, Aurora, Kinoite) · openSUSE
-Aeon/MicroOS · Arch · NixOS · Alpine · Gentoo · Steam Deck · any immutable host
-where layering an RPM is the wrong answer.
-
-If you're on Ubuntu or traditional Fedora, use OpenAI's own signed apt/dnf repo
-instead. This exists for the rest of us.
+This repo packages the **official** ChatGPT / Codex Linux build as a Flatpak, so
+you can run it on any distribution, not just the Red Hat and Debian based ones
+OpenAI ships packages for. That means Fedora atomic (Silverblue, Bluefin,
+Bazzite, Aurora, Kinoite) · openSUSE Aeon/MicroOS · Arch · NixOS · Alpine ·
+Gentoo · Steam Deck · basically any immutable host.
 
 ## Install
 
 ```sh
-flatpak remote-add --user chatgpt https://OWNER.github.io/codex-flatpak/chatgpt.flatpakrepo
+flatpak remote-add --user chatgpt https://rulin132.github.io/codex-flatpak/chatgpt.flatpakrepo
 flatpak install --user chatgpt io.github.rulin132.ChatGPT
 ```
 
-The app **starts with no access to your files.** Grant a workspace explicitly:
+The app starts with **no access to your files.** Grant a directory explicitly,
+for example your Desktop:
 
 ```sh
-flatpak override --user --filesystem=~/code io.github.rulin132.ChatGPT
+flatpak override --user --filesystem=~/Desktop io.github.rulin132.ChatGPT
 ```
 
-Other channels: a signed `.flatpak` bundle on each
-[release](https://github.com/rulin132/codex-flatpak/releases) for sideloading, and
-an OCI image at `ghcr.io/OWNER/chatgpt-flatpak` for
-`flatpak install --image docker://…` (flatpak ≥ 1.17).
-
-## How this differs from the other repackagers
-
-| | this repo | AUR packages | DMG converters |
-|---|---|---|---|
-| Source | official Linux `.deb` | official `.deb` | macOS `.dmg`, converted |
-| Chromium sandbox | **zypak** (renderers isolated) | inherits upstream | `--no-sandbox` by default |
-| Update detection | nightly `flatpak-external-data-checker` → auto-PR | hand-bumped hashes | rebuild on each user's machine |
-| Rolling-URL breakage | detected and re-pinned automatically | breaks until a human notices | n/a |
-| Repo signing | GPG-signed | n/a | one ships an unsigned apt repo |
-| Redistributes OpenAI bytes | **no** (`extra-data`) | no | one does |
-| Layout change upstream | build fails in CI smoke test | silent | patches drift |
-
-## Maintaining it
+Also available as an OCI image at `ghcr.io/rulin132/chatgpt-flatpak`
 
 ```sh
-make rename GH_USER=<you>   # do this first — sets the app-id everywhere
+flatpak install --user --image docker://ghcr.io/rulin132/chatgpt-flatpak:latest
+```
+
+## Sandbox
+
+Sealed by default: no `--filesystem=host`, no
+`--talk-name=org.freedesktop.Flatpak`. The app cannot read your home directory
+or run commands on your host until you grant it.
+
+Renderers stay isolated under zypak rather than `--no-sandbox`, which is what
+the other Linux repackagers of this app use. `--no-sandbox` does not disable
+"a" sandbox, it removes renderer isolation entirely, so any compromised web
+content inherits every permission the flatpak holds.
+
+Review or undo what you have granted:
+
+```sh
+flatpak override --user --show io.github.rulin132.ChatGPT
+flatpak override --user --reset io.github.rulin132.ChatGPT
+```
+
+Read [docs/SECURITY.md](docs/SECURITY.md) before widening it, particularly the
+part about why this is not a trust boundary you should put client work behind.
+
+## Maintaining it
+I'm not the only one that can maintain it, you can too, simple as forking this repository and running the following.
+
+```sh
+make rename GH_USER=<you>   # do this first, sets the app-id everywhere
 make deps                   # runtimes, SDK, Electron BaseApp, linter
 make hashes                 # pin sha256 + size from upstream, sync version
 make icons                  # replace placeholder icons with the real ones
 make install && make run
 ```
 
-Then set three repository secrets — `GPG_PRIVATE_KEY`, `GPG_KEY_ID`,
-and enable Pages (source: GitHub Actions).
+### Repository setup
 
-### The update problem, and how it's solved
+None of this is optional, and nothing here is created for you.
 
-Upstream publishes to a rolling URL with no version in it:
+**Secrets**
 
-```
-https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_amd64.deb
-```
+- `GPG_PRIVATE_KEY` and `GPG_KEY_ID`. Flatpak refuses system-wide installs of an
+  extra-data app from a remote that is not gpg-verified, so publishing without
+  these produces a repo nobody can install system-wide.
+- `AUTOMATION_TOKEN`, a personal access token with `contents: write` and
+  `pull-requests: write`. The nightly update check uses it instead of
+  `GITHUB_TOKEN` because GitHub does not start workflow runs for anything
+  `GITHUB_TOKEN` does: a PR opened with it arrives with zero checks. The
+  workflow fails on the first step with a clear message if this is unset.
 
-Flatpak requires a pinned `sha256` for `extra-data`, so when OpenAI rotates
-those bytes, every *new* install fails with `Invalid checksum for extra data`.
-This is exactly what breaks the AUR packages that pin a hash against `latest/`.
+**Settings**
 
-`flatpak-external-data-checker` handles it: its `URLChecker` runs against every
-`extra-data` source, and for `.deb` payloads it downloads the file and reads
-`Version:` out of the control archive. Rotated bytes → source marked `BROKEN` →
-`sha256` and `size` rewritten → PR opened. `update-check.yml` runs it nightly
-and re-arms its own schedule (GitHub disables cron workflows after 60 days of
-inactivity, which would otherwise kill the bot quietly).
+- Pages, source: GitHub Actions.
+- Make the GHCR package public. A package created by the first push defaults to
+  private, so the `docker://ghcr.io/...` install above returns 401 for everyone
+  until you change it under Packages, package settings, change visibility.
+- Allow auto-merge, under General. Without it the auto-merge step errors out.
+- Branch protection on `main` requiring these four checks: `shellcheck`,
+  `lint`, `build (x86_64, ubuntu-latest)`, `build (aarch64, ubuntu-24.04-arm)`.
 
-The PR is **not** a rubber stamp: CI installs the new payload for real and runs
-`apply_extra`. If upstream moves `app.asar` or renames the binary, that job
-fails and `scripts/inspect-deb.sh` tells you what changed.
+**Labels and variables**
 
-### If a build starts failing
+- A label named `automated`. `gh pr create --label` errors when the label does
+  not exist, so without it the nightly job opens no PR at all.
+- Repository variable `AUTO_UPDATE`. Unset means off, which is how this ships.
+  Set it to `on` to let the nightly refresh PR auto-merge once those four
+  checks pass, and to let a manifest change on `main` publish a release. Unset
+  it to stop the whole pipeline from the GitHub UI in seconds, with no commit
+  and nothing to revert.
+
+### The nightly refresh
+
+`update-check.yml` runs `scripts/refresh-source.sh` at 04:17 UTC. Upstream
+publishes to a rolling `latest` URL, so the bytes behind our pinned sha256
+rotate with no version change. The job re-pins sha256 and size for both
+architectures, bumps the AppStream release entry from the `.deb` control file,
+and opens a PR on `chore/upstream-refresh` labelled `automated`. If the
+repository has been quiet for 50 days it also commits to `chore/keepalive`,
+because GitHub disables scheduled workflows after 60 days of inactivity.
+
+## Known issues
+
+If something misbehaves, capture the log first:
 
 ```sh
-scripts/inspect-deb.sh           # dump the upstream .deb layout
+flatpak run io.github.rulin132.ChatGPT 2>&1 | tee /tmp/chatgpt.log
 ```
 
-`apply_extra` deliberately fails closed — it locates `app.asar` and the main
-ELF binary at install time rather than hardcoding upstream's paths, and aborts
-with a specific message rather than producing a half-unpacked app.
+**The avatar overlay renders as an opaque box on Wayland.** Upstream draws the
+"pet" in a second, frameless, transparent window, and this Electron build does
+not composite window transparency on the Wayland Ozone backend. Measured against
+26.810.52044: broken on Wayland, broken on Wayland with Vulkan disabled, correct
+on XWayland. It is an upstream platform bug, not something this packaging causes.
 
-## Sandbox
+If it bothers you, opt into XWayland per-install:
 
-Sealed by default: **no** `--filesystem=host`, **no**
-`--talk-name=org.freedesktop.Flatpak`. The app cannot read your home directory
-or execute commands on the host until you grant it. Read
-[docs/SECURITY.md](docs/SECURITY.md) before widening that — particularly the
-part about why this is not a trust boundary you should put client work behind.
+```sh
+flatpak override --user --socket=x11 io.github.rulin132.ChatGPT
+```
+
+That is a real trade, not a free fix. XWayland costs you native Wayland scaling
+and input handling, and X11 is a shared server, so the app can observe other X11
+clients. Revert with `--nosocket=x11`.
+
+**Do not "fix" this by adding `--socket=x11` to the manifest.** The launcher
+passes `--ozone-platform-hint=auto`, and this Electron prefers X11 whenever
+`DISPLAY` is set. Granting the socket therefore moves *every* user to XWayland
+rather than offering a fallback. If that ever becomes desirable, the hint has to
+be pinned to `wayland` in the same change.
+
+**A blank window is not fixed with `--disable-gpu`.** That leaves Chromium with
+no rasteriser and opens no window at all. Use `CHATGPT_DISABLE_GPU=1`, which
+routes ANGLE at the bundled SwiftShader instead.
+
+## Uninstalling
+
+```sh
+flatpak uninstall --user io.github.rulin132.ChatGPT
+```
+
+That keeps your data and the cached Codex runtime in
+`~/.var/app/io.github.rulin132.ChatGPT`, which runs to several GB. To remove
+that as well:
+
+```sh
+flatpak uninstall --user --delete-data io.github.rulin132.ChatGPT
+```
 
 ## Legal
 
-The `extra-data` source type means the vendor binary is downloaded from OpenAI
-by *your* machine at install time. This repository hosts no OpenAI software and
-redistributes none. The MIT licence covers the packaging — manifest, scripts,
-metadata — and grants no rights to OpenAI software or services. Not affiliated
-with OpenAI. You need your own ChatGPT account and must comply with OpenAI's
-terms.
+The `extra-data` source type means the vendor binary is downloaded from OpenAI by *your* machine at install time. This repository hosts and redistributes no OpenAI executable code. It does commit seven application icons in `build-aux/icons/`, downscaled from the icon in upstream's `.deb`, because icons and AppStream metadata must exist at build time while the payload only arrives at install time. The MIT licence covers the packaging (manifest, scripts, metadata) and grants no rights to OpenAI software or services. Not affiliated with OpenAI. You need your own ChatGPT account and must comply with OpenAI's terms.

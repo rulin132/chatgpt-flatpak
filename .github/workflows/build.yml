@@ -11,6 +11,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Not in the flatpak container: it ships neither dnf nor shellcheck.
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Print the version: the runner's is older than a typical local one and
+      # still flags SC2015, so green locally and red here look identical.
+      - run: shellcheck --version && shellcheck -x scripts/*.sh tests/*.sh build-aux/apply_extra build-aux/launcher.sh
+      - run: tests/test-sync-version.sh
+
   lint:
     runs-on: ubuntu-latest
     container:
@@ -18,15 +28,21 @@ jobs:
       options: --privileged
     steps:
       - uses: actions/checkout@v4
-      - name: shellcheck
-        run: |
-          dnf install -y ShellCheck || true
-          shellcheck -x scripts/*.sh build-aux/apply_extra build-aux/launcher.sh
+      # The bare binary, NOT `flatpak run org.flatpak.Builder`: that form cannot
+      # create .flatpak-builder in the runner workspace from inside the sandbox
+      # and dies on Permission denied. `make lint` uses the flatpak form because
+      # locally the checkout is under $HOME, which the sandbox can write.
+      # --exceptions is required; --user-exceptions alone is silently inert.
       - name: manifest lint
-        run: flatpak run --command=flatpak-builder-lint org.flatpak.Builder manifest io.github.rulin132.ChatGPT.yaml
+        run: |
+          flatpak-builder-lint --exceptions \
+            --user-exceptions flatpak-builder-lint-exceptions.json \
+            manifest io.github.rulin132.ChatGPT.yaml
 
+  # No `needs:`. The smoke test is the only thing catching upstream layout
+  # drift, and a style or naming problem must not be able to hide a broken
+  # payload. Gating it on the linters is how it came to never run at all.
   build:
-    needs: lint
     strategy:
       fail-fast: false
       matrix:
@@ -42,25 +58,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
-        with:
-          bundle: io.github.rulin132.ChatGPT.flatpak
-          manifest-path: io.github.rulin132.ChatGPT.yaml
-          arch: ${{ matrix.arch }}
-          cache-key: flatpak-builder-${{ matrix.arch }}-${{ github.sha }}
-          # The vendor payload is extra-data: it is fetched on the user's
-          # machine at install time, so the build itself never touches
-          # persistent.oaistatic.com. Only the smoke test below does.
-          upload-artifact: true
-
-      # Real install exercises apply_extra — the only place upstream layout
-      # changes can bite. This is the check that catches a rotated .deb whose
-      # internals moved, which a manifest lint cannot see.
-      - name: smoke test (install + apply_extra)
-        if: matrix.arch == 'x86_64'
+      # A repo, not a bundle: build-bundle cannot carry extra-data
+      # (flatpak#1334), so its .flatpak has no payload. Extra-data is fetched at
+      # install time, so only the smoke test touches persistent.oaistatic.com.
+      - name: build
         run: |
-          flatpak install --user -y --bundle io.github.rulin132.ChatGPT.flatpak
-          flatpak run --command=cat io.github.rulin132.ChatGPT /app/extra/VERSION
-          flatpak run --command=sh io.github.rulin132.ChatGPT -c \
-            'test -f /app/extra/app.env && . /app/extra/app.env && test -x "$APP_BIN"'
-          echo "apply_extra produced a runnable payload"
+          set -euo pipefail
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak-builder --user --install-deps-from=flathub --force-clean \
+            --disable-rofiles-fuse --arch=${{ matrix.arch }} \
+            --repo=repo build io.github.rulin132.ChatGPT.yaml
+
+      # A real install is the only thing that exercises apply_extra, so assert
+      # the payload arrived rather than trusting a zero exit. Runs on both
+      # arches: the arm64 .deb is a separate pinned payload, so limiting this to
+      # x86_64 would let an arm-only layout change stay green and get published.
+      - name: smoke test (install + apply_extra)
+        run: |
+          set -euo pipefail
+          flatpak remote-add --user --if-not-exists --no-gpg-verify chatgpt-ci "$PWD/repo"
+          flatpak install --user -y chatgpt-ci io.github.rulin132.ChatGPT
+          scripts/ci-smoke.sh io.github.rulin132.ChatGPT

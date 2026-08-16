@@ -1,5 +1,5 @@
 #!/bin/sh
-# apply_extra — runs on the USER'S machine at install time, not at build time.
+# apply_extra: runs on the USER'S machine at install time, not at build time.
 #
 # Environment (see flatpak common/flatpak-dir.c, apply_extra_data()):
 #   * cwd is /app/extra, which is the only writable path
@@ -23,8 +23,17 @@ if command -v bsdtar >/dev/null 2>&1; then
     bsdtar -Oxf "$DEB" 'data.tar*'    | bsdtar -xf - || die "failed to extract data.tar"
 elif command -v ar >/dev/null 2>&1; then
     ar x "$DEB" || die "ar failed on $DEB"
-    for f in control.tar.*; do [ -f "$f" ] && tar xf "$f" ./control 2>/dev/null || true; done
-    for f in data.tar.*;    do [ -f "$f" ] && { tar xf "$f" || die "failed to extract $f"; }; done
+    # data.tar* not data.tar.*: an uncompressed data.tar is legal in a .deb and
+    # the narrower glob missed it, then failed two steps later at "no app.asar
+    # found", which names the wrong cause.
+    for f in control.tar*; do
+        [ -f "$f" ] || continue
+        tar xf "$f" ./control 2>/dev/null || true
+    done
+    for f in data.tar*; do
+        [ -f "$f" ] || continue
+        tar xf "$f" || die "failed to extract $f"
+    done
 else
     die "neither bsdtar nor ar available in the runtime"
 fi
@@ -36,13 +45,13 @@ if [ -f control ]; then
 fi
 [ -s VERSION ] || echo "unknown" > VERSION
 
-rm -f "$DEB" control control.tar.* data.tar.* debian-binary
+rm -f "$DEB" control control.tar* data.tar* debian-binary _gpgorigin
 
 # --- 3. locate the payload without hardcoding upstream's layout --------------
-# Upstream may ship under /usr/lib/chatgpt, /opt/chatgpt, /usr/share/... — do
+# Upstream may ship under /usr/lib/chatgpt, /opt/chatgpt, /usr/share/..., so do
 # not guess. Find the Electron resources dir and work back from it.
 ASAR=$(find . -type f -name 'app.asar' -print 2>/dev/null | head -n1 || true)
-[ -n "$ASAR" ] || die "no app.asar found — upstream .deb layout changed, review scripts/inspect-deb.sh output"
+[ -n "$ASAR" ] || die "no app.asar found, upstream .deb layout changed, review scripts/inspect-deb.sh output"
 
 RESOURCES=$(dirname "$ASAR")
 APPDIR=$(dirname "$RESOURCES")
@@ -51,7 +60,8 @@ APPDIR=$(dirname "$RESOURCES")
 # The main binary: an ELF executable in APPDIR that is not a helper.
 APP_BIN=""
 for f in "$APPDIR"/*; do
-    [ -f "$f" ] && [ -x "$f" ] || continue
+    [ -f "$f" ] || continue
+    [ -x "$f" ] || continue
     case "$(basename "$f")" in
         *.so|*.so.*|*sandbox*|*crashpad*|*.pak|*.bin|*.dat|*.json) continue ;;
     esac
@@ -68,20 +78,23 @@ rm -rf ./usr ./opt ./etc ./lib ./var ./app
 mv ./app.tmp ./app
 printf 'APP_BIN=/app/extra/app/%s\n' "$BIN_NAME" > app.env
 
-# --- 5. restore the Chromium sandbox ----------------------------------------
-# Electron's SUID helper cannot work inside flatpak. zypak (from
-# org.electronjs.Electron2.BaseApp) intercepts the sandbox calls instead, and
-# stub_sandbox satisfies Chromium's presence check. This is what keeps renderer
-# processes isolated — the alternative the other repackagers chose is
-# --no-sandbox, which drops renderer isolation entirely.
-if [ -f app/chrome-sandbox ] || [ -f app/chrome_sandbox ]; then
-    install -Dm755 /app/bin/stub_sandbox app/chrome-sandbox 2>/dev/null || true
-    rm -f app/chrome_sandbox
+# --- 5. check the Chromium sandbox ------------------------------------------
+# Asserts rather than installs. Upstream ships no chrome-sandbox and the
+# BaseApp ships no stub_sandbox; zypak takes over before Chromium looks for a
+# helper. Verified on 26.810.50856: the zygote runs under
+# `bwrap ... zypak-helper child`. Both checks are load-bearing. Without zypak
+# nothing is isolated, and a chrome-sandbox appearing upstream means their
+# sandbox model changed and a human has to look before we ship it.
+[ -x /app/bin/zypak-wrapper ] \
+    || die "zypak-wrapper missing from the Electron BaseApp, refusing to install an app whose renderers would be unsandboxed"
+
+if [ -e app/chrome-sandbox ] || [ -e app/chrome_sandbox ]; then
+    die "upstream now ships a chrome-sandbox helper, its sandbox model changed; review before shipping (see docs/SECURITY.md)"
 fi
 
 # --- 6. fix the Wayland window icon / .desktop association ------------------
 # Electron reports "{productName}.desktop"; ours is io.github.rulin132.ChatGPT.
-# Cosmetic only — warn, do not abort, if upstream changes the asar format.
+# Cosmetic, so warn rather than abort if the asar format changes.
 if command -v patch-electron-desktop-filename >/dev/null 2>&1; then
     patch-electron-desktop-filename \
         --desktop-filename io.github.rulin132.ChatGPT \
@@ -89,10 +102,12 @@ if command -v patch-electron-desktop-filename >/dev/null 2>&1; then
         || echo "apply_extra: WARNING desktop-filename patch failed (window icon may be wrong)" >&2
 fi
 
-# --- 7. neuter any in-app updater -------------------------------------------
-# /app is read-only at runtime, so a self-updater cannot succeed — it can only
-# nag or crash. Upstream's mechanism is not yet known; add the specific patch
-# here once identified (cf. Discord's build_info.json newUpdater=false).
-# TODO(verify): inspect app/resources/ for update config after first build.
+# --- 7. in-app updater ------------------------------------------------------
+# Nothing to neuter. Checked against 26.810.50856: it logs enableUpdater=true
+# but never writes to /app, and ships no Squirrel or AppImage updater.
+#
+# What it does do is download a "primary runtime" bundle into $HOME on first
+# launch. That is a separate mechanism, it lands in the app's own data, and it
+# is not this script's business.
 
 echo "apply_extra: installed chatgpt $(cat VERSION) (bin=$BIN_NAME)"

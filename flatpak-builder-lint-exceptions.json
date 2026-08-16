@@ -1,0 +1,5 @@
+{
+  "io.github.rulin132.ChatGPT": {
+    "appid-url-not-reachable": "Repo is codex-flatpak, so the linter looks up github.com/rulin132/chatgpt and gets a 404. Goes away when the app id is settled. See Known issues in README.md."
+  }
+}

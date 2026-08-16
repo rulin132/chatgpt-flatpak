@@ -4,19 +4,19 @@
 # web content inherit every permission this flatpak holds.
 set -eu
 
-[ -f /app/extra/app.env ] || { echo "chatgpt: app.env missing — reinstall the flatpak" >&2; exit 1; }
+[ -f /app/extra/app.env ] || { echo "chatgpt: app.env missing, reinstall the flatpak" >&2; exit 1; }
+# shellcheck source=/dev/null  # written by apply_extra at install time
 . /app/extra/app.env
 
-# Electron writes scratch data next to $TMPDIR; keep it inside the per-app dir.
 export TMPDIR="${XDG_CACHE_HOME:-$HOME/.cache}/tmp"
 mkdir -p "$TMPDIR"
 
-# Ozone picks Wayland when available and falls back to X11 automatically.
 # --enable-wayland-ime is what fixes IME input on Fedora/GNOME Wayland.
 set -- --ozone-platform-hint=auto --enable-wayland-ime "$@"
 
-# Opt-in escape hatches, off by default (see docs/SECURITY.md):
-#   CHATGPT_DISABLE_GPU=1   drop hardware acceleration if you hit a blank window
-[ "${CHATGPT_DISABLE_GPU:-0}" = "1" ] && set -- --disable-gpu "$@"
+# CHATGPT_DISABLE_GPU=1 renders in software (see docs/SECURITY.md).
+# Deliberately not --disable-gpu: that leaves no rasteriser and opens no window
+# at all. Measured on 26.810.52044, --disable-gpu gives 0 windows, this gives 2.
+[ "${CHATGPT_DISABLE_GPU:-0}" = "1" ] && set -- --use-angle=swiftshader "$@"
 
 exec zypak-wrapper "$APP_BIN" "$@"

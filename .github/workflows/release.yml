@@ -1,11 +1,15 @@
 name: release
 
+# Tags stay for human-cut releases. The manifest path trigger is what makes the
+# pipeline reach users: upstream can rotate bytes without changing Version, so a
+# tag-only scheme would collide on an existing tag and skip a payload users
+# need. Publishing on content change handles that; the kill switch gates it.
 on:
   push:
+    tags: ['v*']
     branches: [main]
     paths:
       - 'io.github.rulin132.ChatGPT.yaml'
-      - 'build-aux/**'
   workflow_dispatch:
 
 permissions:
@@ -19,13 +23,88 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  build:
+    if: >-
+      startsWith(github.ref, 'refs/tags/') ||
+      github.event_name == 'workflow_dispatch' ||
+      vars.AUTO_UPDATE == 'on'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+
+      # Unsigned here. Signing happens once, in publish, so the key touches one
+      # job rather than every matrix leg.
+      - name: build
+        run: |
+          set -euo pipefail
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak-builder --user --install-deps-from=flathub --force-clean \
+            --disable-rofiles-fuse --arch=${{ matrix.arch }} \
+            --repo=repo build io.github.rulin132.ChatGPT.yaml
+
+      # Same gate as build.yml. A release must not publish bytes that were never
+      # installed, which is how the tag path used to work.
+      - name: smoke test
+        run: |
+          set -euo pipefail
+          flatpak remote-add --user --if-not-exists --no-gpg-verify chatgpt-rel "$PWD/repo"
+          flatpak install --user -y chatgpt-rel io.github.rulin132.ChatGPT
+          scripts/ci-smoke.sh io.github.rulin132.ChatGPT
+
+      # Tarred, not uploaded as a directory tree. upload-artifact walks files
+      # and so drops empty directories, but an OSTree repo carries five that
+      # are load-bearing (extensions, refs/mirrors, refs/remotes, state,
+      # tmp/cache). Without them `ostree refs` fails with
+      # "opendir(refs/remotes)" on the far side and `ostree init` does not
+      # repair it, so the merge would fail on the first ever run.
+      - name: pack the repo
+        run: tar -cf repo.tar repo
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: repo-${{ matrix.arch }}
+          path: repo.tar
+          retention-days: 1
+
   publish:
+    needs: build
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
       options: --privileged
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: arch-repos
+
+      - name: read version
+        id: ver
+        run: echo "v=$(sed -n 's/.*<release version="\([^"]*\)".*/\1/p' build-aux/io.github.rulin132.ChatGPT.metainfo.xml | head -n1)" >> "$GITHUB_OUTPUT"
+
+      # Before anything is signed, uploaded or pushed. The release, the GHCR
+      # tags and the Pages site all carry the metainfo version, so a tag that
+      # disagrees with it would publish under a version nobody authorised.
+      # Manual dispatch keeps the derived behaviour and skips this.
+      - name: tag must match the manifest version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          set -euo pipefail
+          want="v${{ steps.ver.outputs.v }}"
+          test "${{ github.ref_name }}" = "$want" || {
+            echo "tag ${{ github.ref_name }} does not match metainfo $want"; exit 1; }
 
       # GPG signing is not optional: flatpak refuses system-wide installs of
       # extra-data apps from a source that is not gpg-verified.
@@ -39,41 +118,33 @@ jobs:
           echo "$GPG_PRIVATE_KEY" | gpg --batch --import
           echo "GNUPGHOME=$GNUPGHOME" >> "$GITHUB_ENV"
 
-      - name: build + sign repo
+      # Named `repo` because publish-pages.sh copies that path unchanged.
+      - name: merge and sign
         env:
           GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
         run: |
           set -euo pipefail
-          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-          flatpak-builder --user --install-deps-from=flathub --force-clean \
-            --disable-rofiles-fuse --disable-updates \
-            --gpg-sign="$GPG_KEY_ID" --repo=repo build io.github.rulin132.ChatGPT.yaml
-          # Static deltas matter here: archive-z2 is one HTTP request per file,
-          # which is brutal against Pages.
+          for arch in x86_64 aarch64; do
+            tar -xf "arch-repos/repo-$arch/repo.tar" -C "arch-repos/repo-$arch"
+          done
+          ./scripts/merge-repos.sh repo \
+            arch-repos/repo-x86_64/repo arch-repos/repo-aarch64/repo
           flatpak build-update-repo --gpg-sign="$GPG_KEY_ID" \
             --generate-static-deltas --prune repo/
+          echo "published refs:"; ostree --repo=repo refs | grep '^app/'
 
-      - name: build sideload bundle
-        env:
-          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
-        run: |
-          flatpak build-bundle --gpg-sign="$GPG_KEY_ID" \
-            --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo \
-            repo io.github.rulin132.ChatGPT.flatpak io.github.rulin132.ChatGPT
+      # No sideload bundle: build-bundle cannot carry an extra-data source
+      # (flatpak#1334), so the .flatpak it produces has no application in it.
 
       - name: assemble Pages site
         env:
           GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
-          PAGES_URL: https://OWNER.github.io/codex-flatpak
+          PAGES_URL: https://rulin132.github.io/codex-flatpak
         run: ./scripts/publish-pages.sh
 
       - uses: actions/upload-pages-artifact@v3
         with:
           path: public
-
-      - name: read version
-        id: ver
-        run: echo "v=$(sed -n 's/.*<release version="\([^"]*\)".*/\1/p' build-aux/io.github.rulin132.ChatGPT.metainfo.xml | head -n1)" >> "$GITHUB_OUTPUT"
 
       - name: publish OCI image to GHCR
         run: |
@@ -87,20 +158,17 @@ jobs:
           skopeo copy --format oci oci:oci-image \
             "docker://ghcr.io/${{ github.repository_owner }}/chatgpt-flatpak:latest"
 
+      # No files: attached, per the bundle note above. The release is a marker
+      # pointing at the repo remote.
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.ver.outputs.v }}
-          files: io.github.rulin132.ChatGPT.flatpak
-          fail_on_unmatched_files: true
           body: |
             Packaging build for upstream ChatGPT ${{ steps.ver.outputs.v }}.
 
-            Preferred install (auto-updates):
-                flatpak remote-add --user chatgpt https://OWNER.github.io/codex-flatpak/chatgpt.flatpakrepo
+            Install:
+                flatpak remote-add --user chatgpt https://rulin132.github.io/codex-flatpak/chatgpt.flatpakrepo
                 flatpak install --user chatgpt io.github.rulin132.ChatGPT
-
-            Sideload (no auto-update):
-                flatpak install --user ./io.github.rulin132.ChatGPT.flatpak
 
   deploy-pages:
     needs: publish

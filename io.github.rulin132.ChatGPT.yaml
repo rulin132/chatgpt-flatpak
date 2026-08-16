@@ -10,7 +10,7 @@ tags:
   - proprietary
 
 # ---------------------------------------------------------------------------
-# SEALED SANDBOX (default posture — see docs/SECURITY.md)
+# SEALED SANDBOX (default posture, see docs/SECURITY.md)
 #
 # Deliberately absent:
 #   --filesystem=host                     the app sees NO user files by default
@@ -34,7 +34,14 @@ finish-args:
   - --talk-name=org.kde.kwalletd6
   # Tray icon (StatusNotifierItem only; GNOME additionally needs a shell ext).
   - --talk-name=org.kde.StatusNotifierWatcher
-  # Notifications go through the portal — no talk-name needed since BaseApp 23.08.
+  # Notifications go through the portal, no talk-name needed since BaseApp 23.08.
+  #
+  # The app hardcodes ~/.codex and ~/.cache, ignoring XDG_CACHE_HOME, and
+  # re-downloads its Codex runtime (~67s) on every start without these, because
+  # $HOME is a throwaway tmpfs. --persist does NOT widen the sandbox: it binds
+  # subdirectories of ~/.var/app/<id>/. No host path becomes visible.
+  - --persist=.codex
+  - --persist=.cache
   - --env=ELECTRON_TRASH=gio
   - --env=XCURSOR_PATH=/run/host/user-share/icons:/run/host/share/icons
 
@@ -67,11 +74,13 @@ modules:
       # host or redistribute OpenAI's bytes. sha256 + size are MANDATORY and are
       # verified before apply_extra runs.
       #
-      # The URL is a rolling "latest" alias with no version in the path. The
-      # flatpak-external-data-checker URLChecker runs against every extra-data
-      # source, and for .deb payloads it reads Version: out of the control
-      # archive — so the nightly job detects rotated bytes, marks the source
-      # BROKEN, and rewrites sha256/size automatically. See update-check.yml.
+      # The URL is a rolling "latest" alias with no version in the path, so the
+      # bytes behind these hashes rotate without warning. update-check.yml runs
+      # scripts/refresh-source.sh nightly: it downloads both .debs, rewrites the
+      # sha256/size below, reads Version: out of the x86_64 control archive, and
+      # opens a PR. The x-checker-data blocks are unused today; nothing runs
+      # flatpak-external-data-checker. They are kept so a future move to it, or
+      # to Flathub's own bot, does not have to reconstruct them.
       #
       # Run `make hashes` to populate these for the first time.
       - type: extra-data
@@ -79,8 +88,8 @@ modules:
         only-arches:
           - x86_64
         url: https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_amd64.deb
-        sha256: 0000000000000000000000000000000000000000000000000000000000000000
-        size: 0
+        sha256: 708a15a1bb76e2bb7f0e376e5145391fa277ad3a64057c1d32537bdc2a1b4e6e
+        size: 391801406
         x-checker-data:
           type: rotating-url
           url: https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_amd64.deb
@@ -91,8 +100,8 @@ modules:
         only-arches:
           - aarch64
         url: https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_arm64.deb
-        sha256: 0000000000000000000000000000000000000000000000000000000000000000
-        size: 0
+        sha256: 6ebea681b1e494d218a199f638b4bc886e94e1458dd61079b1e390a6fb98fdd2
+        size: 361647242
         x-checker-data:
           type: rotating-url
           url: https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_arm64.deb
