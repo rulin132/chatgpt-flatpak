@@ -59,7 +59,7 @@ jobs:
       - name: assemble Pages site
         env:
           GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
-          PAGES_URL: https://OWNER.github.io/codex-flatpak
+          PAGES_URL: https://rulin132.github.io/codex-flatpak
         run: ./scripts/publish-pages.sh
 
       - uses: actions/upload-pages-artifact@v3
@@ -91,7 +91,7 @@ jobs:
             Packaging build for upstream ChatGPT ${{ steps.ver.outputs.v }}.
 
             Install:
-                flatpak remote-add --user chatgpt https://OWNER.github.io/codex-flatpak/chatgpt.flatpakrepo
+                flatpak remote-add --user chatgpt https://rulin132.github.io/codex-flatpak/chatgpt.flatpakrepo
                 flatpak install --user chatgpt io.github.rulin132.ChatGPT
 
   deploy-pages:

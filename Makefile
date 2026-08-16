@@ -29,7 +29,10 @@ help:
 rename:
 	@test -n "$(GH_USER)" || { echo "usage: make rename GH_USER=<your-github-username>"; exit 1; }
 	@for f in $$(grep -rl 'OWNER' --exclude-dir=.git --exclude-dir=build --exclude-dir=repo .); do \
-	  sed -i "s/io\.github\.OWNER/io.github.$(GH_USER)/g; s|github\.com/OWNER|github.com/$(GH_USER)|g" "$$f"; \
+	  sed -i "s/io\.github\.OWNER/io.github.$(GH_USER)/g; \
+	          s|github\.com/OWNER|github.com/$(GH_USER)|g; \
+	          s|OWNER\.github\.io|$(GH_USER).github.io|g; \
+	          s|ghcr\.io/OWNER|ghcr.io/$(GH_USER)|g" "$$f"; \
 	done
 	@for f in $$(find . -name '*OWNER*' -not -path './.git/*'); do \
 	  git mv "$$f" "$${f//OWNER/$(GH_USER)}" 2>/dev/null || mv "$$f" "$${f//OWNER/$(GH_USER)}"; \

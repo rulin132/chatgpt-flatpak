@@ -6,7 +6,7 @@ Aeon/MicroOS · Arch · NixOS · Alpine · Gentoo · Steam Deck · basically any
 ## Install
 
 ```sh
-flatpak remote-add --user chatgpt https://OWNER.github.io/codex-flatpak/chatgpt.flatpakrepo
+flatpak remote-add --user chatgpt https://rulin132.github.io/codex-flatpak/chatgpt.flatpakrepo
 flatpak install --user chatgpt io.github.rulin132.ChatGPT
 ```
 
@@ -16,10 +16,10 @@ If you want access to the Desktop, please use this commend.
 flatpak override --user --filesystem=~/code io.github.rulin132.ChatGPT
 ```
 
-Also available as an OCI image at `ghcr.io/OWNER/chatgpt-flatpak`
+Also available as an OCI image at `ghcr.io/rulin132/chatgpt-flatpak`
 
 ```sh
-flatpak install --user --image docker://ghcr.io/OWNER/chatgpt-flatpak:latest
+flatpak install --user --image docker://ghcr.io/rulin132/chatgpt-flatpak:latest
 ```
 
 ## Maintaining it
