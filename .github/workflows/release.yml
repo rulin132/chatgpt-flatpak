@@ -27,6 +27,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: read version
+        id: ver
+        run: echo "v=$(sed -n 's/.*<release version="\([^"]*\)".*/\1/p' build-aux/io.github.rulin132.ChatGPT.metainfo.xml | head -n1)" >> "$GITHUB_OUTPUT"
+
+      # Before anything is signed, uploaded or pushed. The release, the GHCR
+      # tags and the Pages site all carry the metainfo version, so a tag that
+      # disagrees with it would publish under a version nobody authorised.
+      # Manual dispatch keeps the derived behaviour and skips this.
+      - name: tag must match the manifest version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          set -euo pipefail
+          want="v${{ steps.ver.outputs.v }}"
+          test "${{ github.ref_name }}" = "$want" || {
+            echo "tag ${{ github.ref_name }} does not match metainfo $want"; exit 1; }
+
       # GPG signing is not optional: flatpak refuses system-wide installs of
       # extra-data apps from a source that is not gpg-verified.
       - name: import signing key
@@ -66,9 +82,6 @@ jobs:
         with:
           path: public
 
-      - name: read version
-        id: ver
-        run: echo "v=$(sed -n 's/.*<release version="\([^"]*\)".*/\1/p' build-aux/io.github.rulin132.ChatGPT.metainfo.xml | head -n1)" >> "$GITHUB_OUTPUT"
 
       - name: publish OCI image to GHCR
         run: |

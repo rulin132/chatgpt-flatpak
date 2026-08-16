@@ -70,9 +70,10 @@ jobs:
             --repo=repo build io.github.rulin132.ChatGPT.yaml
 
       # A real install is the only thing that exercises apply_extra, so assert
-      # the payload arrived rather than trusting a zero exit.
+      # the payload arrived rather than trusting a zero exit. Runs on both
+      # arches: the arm64 .deb is a separate pinned payload, so limiting this to
+      # x86_64 would let an arm-only layout change stay green and get published.
       - name: smoke test (install + apply_extra)
-        if: matrix.arch == 'x86_64'
         run: |
           set -euo pipefail
           flatpak remote-add --user --if-not-exists --no-gpg-verify chatgpt-ci "$PWD/repo"

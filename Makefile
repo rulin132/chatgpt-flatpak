@@ -8,6 +8,11 @@ LINT_EXCEPTIONS := flatpak-builder-lint-exceptions.json
 GPG_KEY  ?=
 GPG_ARGS := $(if $(GPG_KEY),--gpg-sign=$(GPG_KEY),)
 
+# Derived from APP_ID, not the literal OWNER, so rename works from any state.
+# Once the scaffold has been renamed once there is no OWNER left to match, and
+# matching it would make the target a silent no-op for the next forker.
+CURRENT_USER := $(word 3,$(subst ., ,$(APP_ID)))
+
 # The distros this exists for cannot layer flatpak-builder.
 FB := $(shell command -v flatpak-builder 2>/dev/null || echo 'flatpak run org.flatpak.Builder')
 
@@ -28,16 +33,27 @@ help:
 
 rename:
 	@test -n "$(GH_USER)" || { echo "usage: make rename GH_USER=<your-github-username>"; exit 1; }
-	@for f in $$(grep -rl 'OWNER' --exclude-dir=.git --exclude-dir=build --exclude-dir=repo .); do \
-	  sed -i "s/io\.github\.OWNER/io.github.$(GH_USER)/g; \
-	          s|github\.com/OWNER|github.com/$(GH_USER)|g; \
-	          s|OWNER\.github\.io|$(GH_USER).github.io|g; \
-	          s|ghcr\.io/OWNER|ghcr.io/$(GH_USER)|g" "$$f"; \
-	done
-	@for f in $$(find . -name '*OWNER*' -not -path './.git/*'); do \
-	  git mv "$$f" "$${f//OWNER/$(GH_USER)}" 2>/dev/null || mv "$$f" "$${f//OWNER/$(GH_USER)}"; \
-	done
-	@echo "renamed to io.github.$(GH_USER).ChatGPT, commit the result"
+	@# One shell: `exit` in a make recipe only ends its own line, so an early
+	@# return has to be an if/else rather than a guard clause.
+	@if [ "$(GH_USER)" = "$(CURRENT_USER)" ]; then \
+	  echo "already io.github.$(CURRENT_USER).ChatGPT, nothing to do"; \
+	else \
+	  for f in $$(grep -rl '$(CURRENT_USER)' --exclude-dir=.git --exclude-dir=build \
+	      --exclude-dir=repo --exclude-dir=.cache --exclude-dir=oci \
+	      --exclude-dir=.flatpak-builder .); do \
+	    sed -i "s/io\.github\.$(CURRENT_USER)/io.github.$(GH_USER)/g; \
+	            s|github\.com/$(CURRENT_USER)|github.com/$(GH_USER)|g; \
+	            s|$(CURRENT_USER)\.github\.io|$(GH_USER).github.io|g; \
+	            s|ghcr\.io/$(CURRENT_USER)|ghcr.io/$(GH_USER)|g" "$$f"; \
+	  done; \
+	  for f in $$(find . -name '*$(CURRENT_USER)*' -not -path './.git/*' \
+	      -not -path './build/*' -not -path './repo/*' -not -path './.cache/*' \
+	      -not -path './oci/*' -not -path './.flatpak-builder/*'); do \
+	    n=$$(echo "$$f" | sed 's/$(CURRENT_USER)/$(GH_USER)/'); \
+	    git mv "$$f" "$$n" 2>/dev/null || mv "$$f" "$$n"; \
+	  done; \
+	  echo "renamed to io.github.$(GH_USER).ChatGPT, commit the result"; \
+	fi
 
 deps:
 	flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo

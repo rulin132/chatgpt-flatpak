@@ -19,7 +19,11 @@ OUT=build-aux/icons
 DEB=$(scripts/fetch-deb.sh amd64)
 WORK=$(mktemp -d); trap 'rm -rf "$WORK"' EXIT
 
+# Clear first. The downscale loop below skips any size that already exists, so
+# with every size committed this script was a no-op and an upstream icon change
+# would silently keep the old ones.
 mkdir -p "$OUT"
+rm -f "$OUT"/*.png
 deb_cat "$DEB" "$(deb_member "$DEB" data.tar)" | tar x -C "$WORK" ./usr/share
 
 # Prefer a real hicolor icon at each size; fall back to the largest PNG shipped.
