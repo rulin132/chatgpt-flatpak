@@ -62,10 +62,19 @@ jobs:
           flatpak install --user -y chatgpt-rel io.github.rulin132.ChatGPT
           scripts/ci-smoke.sh io.github.rulin132.ChatGPT
 
+      # Tarred, not uploaded as a directory tree. upload-artifact walks files
+      # and so drops empty directories, but an OSTree repo carries five that
+      # are load-bearing (extensions, refs/mirrors, refs/remotes, state,
+      # tmp/cache). Without them `ostree refs` fails with
+      # "opendir(refs/remotes)" on the far side and `ostree init` does not
+      # repair it, so the merge would fail on the first ever run.
+      - name: pack the repo
+        run: tar -cf repo.tar repo
+
       - uses: actions/upload-artifact@v4
         with:
           name: repo-${{ matrix.arch }}
-          path: repo
+          path: repo.tar
           retention-days: 1
 
   publish:
@@ -115,7 +124,11 @@ jobs:
           GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
         run: |
           set -euo pipefail
-          ./scripts/merge-repos.sh repo arch-repos/repo-x86_64 arch-repos/repo-aarch64
+          for arch in x86_64 aarch64; do
+            tar -xf "arch-repos/repo-$arch/repo.tar" -C "arch-repos/repo-$arch"
+          done
+          ./scripts/merge-repos.sh repo \
+            arch-repos/repo-x86_64/repo arch-repos/repo-aarch64/repo
           flatpak build-update-repo --gpg-sign="$GPG_KEY_ID" \
             --generate-static-deltas --prune repo/
           echo "published refs:"; ostree --repo=repo refs | grep '^app/'
