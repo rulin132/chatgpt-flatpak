@@ -1,7 +1,10 @@
 # ChatGPT / Codex Desktop Flatpak
 
-This directory contains the Flatpak manifest and build configuration for Claude Desktop, allowing you to run Claude on any Linux distribution (not just Red Hat and Debian based ones). This repo packages the **official** Linux build as a Flatpak, allowing those on Fedora atomic (Silverblue, Bluefin, Bazzite, Aurora, Kinoite) · openSUSE
-Aeon/MicroOS · Arch · NixOS · Alpine · Gentoo · Steam Deck · basically any immutable host to be able to run this application.
+This repo packages the **official** ChatGPT / Codex Linux build as a Flatpak, so
+you can run it on any distribution, not just the Red Hat and Debian based ones
+OpenAI ships packages for. That means Fedora atomic (Silverblue, Bluefin,
+Bazzite, Aurora, Kinoite) · openSUSE Aeon/MicroOS · Arch · NixOS · Alpine ·
+Gentoo · Steam Deck · basically any immutable host.
 
 ## Install
 
@@ -10,10 +13,11 @@ flatpak remote-add --user chatgpt https://rulin132.github.io/codex-flatpak/chatg
 flatpak install --user chatgpt io.github.rulin132.ChatGPT
 ```
 
-If you want access to the Desktop, please use this commend.
+The app starts with **no access to your files.** Grant a directory explicitly,
+for example your Desktop:
 
 ```sh
-flatpak override --user --filesystem=~/code io.github.rulin132.ChatGPT
+flatpak override --user --filesystem=~/Desktop io.github.rulin132.ChatGPT
 ```
 
 Also available as an OCI image at `ghcr.io/rulin132/chatgpt-flatpak`
@@ -21,6 +25,27 @@ Also available as an OCI image at `ghcr.io/rulin132/chatgpt-flatpak`
 ```sh
 flatpak install --user --image docker://ghcr.io/rulin132/chatgpt-flatpak:latest
 ```
+
+## Sandbox
+
+Sealed by default: no `--filesystem=host`, no
+`--talk-name=org.freedesktop.Flatpak`. The app cannot read your home directory
+or run commands on your host until you grant it.
+
+Renderers stay isolated under zypak rather than `--no-sandbox`, which is what
+the other Linux repackagers of this app use. `--no-sandbox` does not disable
+"a" sandbox, it removes renderer isolation entirely, so any compromised web
+content inherits every permission the flatpak holds.
+
+Review or undo what you have granted:
+
+```sh
+flatpak override --user --show io.github.rulin132.ChatGPT
+flatpak override --user --reset io.github.rulin132.ChatGPT
+```
+
+Read [docs/SECURITY.md](docs/SECURITY.md) before widening it, particularly the
+part about why this is not a trust boundary you should put client work behind.
 
 ## Maintaining it
 I'm not the only one that can maintain it, you can too, simple as forking this repository and running the following.
@@ -37,6 +62,12 @@ Then set two repository secrets, `GPG_PRIVATE_KEY` and `GPG_KEY_ID`,
 and enable Pages (source: GitHub Actions).
 
 ## Known issues
+
+If something misbehaves, capture the log first:
+
+```sh
+flatpak run io.github.rulin132.ChatGPT 2>&1 | tee /tmp/chatgpt.log
+```
 
 **The avatar overlay renders as an opaque box on Wayland.** Upstream draws the
 "pet" in a second, frameless, transparent window, and this Electron build does
@@ -60,7 +91,23 @@ passes `--ozone-platform-hint=auto`, and this Electron prefers X11 whenever
 rather than offering a fallback. If that ever becomes desirable, the hint has to
 be pinned to `wayland` in the same change.
 
-**A blank window is not fixed with `--disable-gpu`.** Use `CHATGPT_DISABLE_GPU=1`,
+**A blank window is not fixed with `--disable-gpu`.** That leaves Chromium with
+no rasteriser and opens no window at all. Use `CHATGPT_DISABLE_GPU=1`, which
+routes ANGLE at the bundled SwiftShader instead.
+
+## Uninstalling
+
+```sh
+flatpak uninstall --user io.github.rulin132.ChatGPT
+```
+
+That keeps your data and the cached Codex runtime in
+`~/.var/app/io.github.rulin132.ChatGPT`, which runs to several GB. To remove
+that as well:
+
+```sh
+flatpak uninstall --user --delete-data io.github.rulin132.ChatGPT
+```
 
 ## Legal
 
