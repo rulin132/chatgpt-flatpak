@@ -79,6 +79,22 @@ check        "newest entry is first"          "$out" '<release version="6.0.0" d
 check        "keeps the four next-newest"     "$out" '<release version="2.0.0"'
 check_absent "evicts the sixth"               "$out" '<release version="1.0.0"'
 
+# Upstream can re-publish a version we already list (a rollback). The entry has
+# to move to the front: ci-smoke.sh reads the first one, so a no-op here leaves
+# the head entry wrong and CI red on every arch, every night, with no recovery.
+out=$(run_case '    <release version="5.0.0" date="2026-08-05"/>
+    <release version="4.0.0" date="2026-08-04"/>
+    <release version="3.0.0" date="2026-08-03"/>
+' 4.0.0 2026-08-07)
+check "rollback moves the entry to the front" "$(grep -m1 '<release ' <<<"$out")" \
+      '<release version="4.0.0" date="2026-08-07"/>'
+if [ "$(grep -c 'version="4.0.0"' <<<"$out")" -eq 1 ]; then
+    pass=$((pass + 1)); echo "  ok   rollback leaves exactly one entry"
+else
+    fail=$((fail + 1)); echo "  FAIL rollback leaves exactly one entry"
+    printf '%s\n' "$out"
+fi
+
 # A metainfo with no <releases> block must abort, not write a broken file.
 work=$(mktemp -d); mkdir -p "$work/build-aux"
 printf '<component><id>test</id></component>\n' > "$work/build-aux/test.metainfo.xml"
