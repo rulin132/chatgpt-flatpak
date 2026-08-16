@@ -12,8 +12,12 @@ source code, that collapses two boundaries at once.
 
 `org.electronjs.Electron2.BaseApp` ships [zypak](https://github.com/refi64/zypak),
 which intercepts Chromium's sandbox calls and runs each renderer in a nested
-flatpak sub-sandbox instead. `apply_extra` installs `stub_sandbox` over
-upstream's `chrome-sandbox` to satisfy Chromium's presence check.
+flatpak sub-sandbox instead. Nothing is stubbed out: upstream ships no
+`chrome-sandbox` and the BaseApp no longer ships `stub_sandbox`, and zypak
+takes over before Chromium looks for a helper. `apply_extra` therefore
+asserts rather than installs. It refuses to install if `zypak-wrapper` is
+missing, and aborts if upstream starts shipping a `chrome-sandbox`, since
+either would mean the sandbox model changed and a human should look.
 `--require-version=1.8.2` is in `finish-args` because zypak's faster spawn
 strategy needs `expose-pids`.
 
@@ -73,7 +77,11 @@ problem entirely.
   system-wide installs of extra-data apps from sources that are not
   gpg-verified.
 - `apply_extra` fails closed on unexpected layout instead of proceeding.
-- Nothing from OpenAI is rebuilt, patched into a binary artifact, or re-hosted.
+- No OpenAI executable code is rebuilt, patched into a binary artifact, or
+  re-hosted. The one exception is artwork: `build-aux/icons/` holds seven PNGs
+  downscaled from the icon in upstream's `.deb`, committed because AppStream
+  metadata and icons must exist at build time while the payload only arrives at
+  install time. Regenerate them with `make icons`.
 
 ## Reporting
 

@@ -22,7 +22,21 @@ app_id="${1:?usage: ci-smoke.sh <app-id>}"
 
 version=$(flatpak run --command=cat "$app_id" /app/extra/VERSION)
 echo "apply_extra reported upstream version: $version"
-test -n "$version" && test "$version" != unknown
+[ -n "$version" ] || { echo "VERSION is empty"; exit 1; }
+[ "$version" != unknown ] || { echo "VERSION is unknown, control file unreadable"; exit 1; }
+
+# The amd64 and arm64 URLs rotate independently, so both arches passing an
+# empty-or-unknown check still allows them to be pinned at different upstream
+# versions. Compare against the AppStream release each job was built from.
+metainfo=$(dirname "$0")/../build-aux/io.github.rulin132.ChatGPT.metainfo.xml
+[ -f "$metainfo" ] || { echo "cannot find $metainfo"; exit 1; }
+want=$(sed -n 's/.*<release version="\([^"]*\)".*/\1/p' "$metainfo" | head -n1)
+[ -n "$want" ] || { echo "no <release version> in $metainfo"; exit 1; }
+[ "$version" = "$want" ] || {
+  echo "payload is $version but AppStream says $want; the pinned arches disagree"
+  exit 1
+}
+echo "version matches AppStream: $want"
 
 # shellcheck disable=SC2016  # single-quoted on purpose: expands inside the sandbox, not here
 flatpak run --command=sh "$app_id" -c '

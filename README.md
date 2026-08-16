@@ -111,4 +111,4 @@ flatpak uninstall --user --delete-data io.github.rulin132.ChatGPT
 
 ## Legal
 
-The `extra-data` source type means the vendor binary is downloaded from OpenAI by *your* machine at install time. This repository hosts no OpenAI software and redistributes none. The MIT licence covers the packaging (manifest, scripts, metadata) and grants no rights to OpenAI software or services. Not affiliated with OpenAI. You need your own ChatGPT account and must comply with OpenAI's terms.
+The `extra-data` source type means the vendor binary is downloaded from OpenAI by *your* machine at install time. This repository hosts and redistributes no OpenAI executable code. It does commit seven application icons in `build-aux/icons/`, downscaled from the icon in upstream's `.deb`, because icons and AppStream metadata must exist at build time while the payload only arrives at install time. The MIT licence covers the packaging (manifest, scripts, metadata) and grants no rights to OpenAI software or services. Not affiliated with OpenAI. You need your own ChatGPT account and must comply with OpenAI's terms.

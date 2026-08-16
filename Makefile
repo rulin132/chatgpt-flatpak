@@ -83,8 +83,12 @@ build:
 # cannot nest a user namespace inside the org.flatpak.Builder sandbox. And
 # build-bundle reads extra-data only from detached metadata, so its bundle has
 # no payload; a repo remote reads it from the commit metadata and works.
+# Recreated, not --if-not-exists: that preserves an existing remote, so moving
+# the checkout or changing REPO leaves it pointing at the old path and the
+# install silently succeeds against a stale build.
 install: build
-	flatpak remote-add --user --if-not-exists --no-gpg-verify $(LOCAL_REMOTE) $(CURDIR)/$(REPO)
+	-flatpak remote-delete --user --force $(LOCAL_REMOTE) 2>/dev/null
+	flatpak remote-add --user --no-gpg-verify $(LOCAL_REMOTE) $(CURDIR)/$(REPO)
 	flatpak install --user -y --reinstall $(LOCAL_REMOTE) $(APP_ID)
 
 run:
