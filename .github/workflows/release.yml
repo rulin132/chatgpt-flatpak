@@ -131,8 +131,18 @@ jobs:
           done
           ./scripts/merge-repos.sh repo \
             arch-repos/repo-x86_64/repo arch-repos/repo-aarch64/repo
+          # Creates the appstream refs, so it runs before the signing pass.
           flatpak build-update-repo --gpg-sign="$GPG_KEY_ID" \
             --generate-static-deltas --prune repo/
+          # build-update-repo signs the summary, not the commits, and
+          # merge-repos.sh copies commits verbatim through `ostree pull-local`,
+          # which preserves their absent signatures. Without this the remote
+          # advertises a GPGKey, every client turns commit verification on, and
+          # the install dies with "no signatures found" after the summary has
+          # already verified fine. Signing a signed commit errors, so skip the
+          # ones build-update-repo made itself.
+          ./scripts/sign-repo.sh repo "$GPG_KEY_ID"
+          flatpak build-update-repo --gpg-sign="$GPG_KEY_ID" repo/
           echo "published refs:"; ostree --repo=repo refs | grep '^app/'
 
       # No sideload bundle: build-bundle cannot carry an extra-data source
@@ -219,3 +229,45 @@ jobs:
     steps:
       - id: deploy
         uses: actions/deploy-pages@v4
+
+  # The only job that tests what a user actually does. Every other install in
+  # this pipeline reads a local repo directory with --no-gpg-verify, which is
+  # how a remote with signed summary and unsigned commits went out green: the
+  # smoke test disabled the exact check that was broken. This one installs over
+  # HTTPS from the published URL with verification left on, so a signing
+  # regression fails the release instead of reaching users.
+  #
+  # Last, and allowed to fail loudly, because by this point the bytes are
+  # already public. It reports rather than prevents.
+  verify-published-remote:
+    needs: [publish, deploy-pages]
+    runs-on: ubuntu-latest
+    steps:
+      # ci-smoke.sh reads build-aux/*.metainfo.xml to check the installed
+      # payload against the version this release claims, so it needs the tree.
+      - uses: actions/checkout@v4
+
+      - name: install from the published remote
+        env:
+          REPO_URL: https://rulin132.github.io/codex-flatpak/chatgpt.flatpakrepo
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y flatpak
+
+          # Pages keeps serving the old deploy for a short window after the API
+          # reports success, so wait for the URL rather than trusting timing.
+          for _ in $(seq 1 30); do
+            curl -fsS -o /dev/null "$REPO_URL" && break
+            sleep 10
+          done
+          curl -fsS -o /dev/null "$REPO_URL" \
+            || { echo "$REPO_URL never became reachable"; exit 1; }
+
+          flatpak remote-add --user --if-not-exists flathub \
+            https://flathub.org/repo/flathub.flatpakrepo
+          flatpak remote-add --user chatgpt "$REPO_URL"
+          # No --no-gpg-verify. That omission is the whole point of this job.
+          flatpak install --user -y chatgpt io.github.rulin132.ChatGPT
+          scripts/ci-smoke.sh io.github.rulin132.ChatGPT
+          echo "verified: installs from the published remote with GPG on"
