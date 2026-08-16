@@ -23,11 +23,14 @@ if command -v bsdtar >/dev/null 2>&1; then
     bsdtar -Oxf "$DEB" 'data.tar*'    | bsdtar -xf - || die "failed to extract data.tar"
 elif command -v ar >/dev/null 2>&1; then
     ar x "$DEB" || die "ar failed on $DEB"
-    for f in control.tar.*; do
+    # data.tar* not data.tar.*: an uncompressed data.tar is legal in a .deb and
+    # the narrower glob missed it, then failed two steps later at "no app.asar
+    # found", which names the wrong cause.
+    for f in control.tar*; do
         [ -f "$f" ] || continue
         tar xf "$f" ./control 2>/dev/null || true
     done
-    for f in data.tar.*; do
+    for f in data.tar*; do
         [ -f "$f" ] || continue
         tar xf "$f" || die "failed to extract $f"
     done
@@ -42,7 +45,7 @@ if [ -f control ]; then
 fi
 [ -s VERSION ] || echo "unknown" > VERSION
 
-rm -f "$DEB" control control.tar.* data.tar.* debian-binary _gpgorigin
+rm -f "$DEB" control control.tar* data.tar* debian-binary _gpgorigin
 
 # --- 3. locate the payload without hardcoding upstream's layout --------------
 # Upstream may ship under /usr/lib/chatgpt, /opt/chatgpt, /usr/share/..., so do
