@@ -27,10 +27,14 @@ flatpak run --command=sh "$app_id" -c '
   echo "payload OK: $APP_BIN"
 '
 
-# The payload unpacking is not proof it runs. zypak needs no session
-# bus (measured), but Electron needs a display, so give it a virtual
-# one. timeout kills a healthy app, so the grep decides, not the exit.
-xvfb-run -a --server-args='-screen 0 1280x800x24' \
+# The payload unpacking is not proof it runs. The sandboxed app needs no
+# session bus (measured), but zypak-helper itself, running on the host
+# before it ever enters the sandbox, asserts on one to pick a zygote
+# strategy. The CI container has no dbus-daemon and X11 autolaunch is
+# compiled out, so give it a private bus. Electron also needs a display,
+# so give it a virtual one too. timeout kills a healthy app, so the grep
+# decides, not the exit.
+dbus-run-session -- xvfb-run -a --server-args='-screen 0 1280x800x24' \
   timeout 120 flatpak run "$app_id" > /tmp/launch.log 2>&1 || true
 grep -q 'window ready-to-show' /tmp/launch.log || {
   echo "app never reached window ready-to-show"
