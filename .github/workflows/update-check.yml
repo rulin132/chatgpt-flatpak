@@ -44,12 +44,17 @@ jobs:
           git checkout -B chore/upstream-refresh
           git commit -am "Re-pin upstream $ver"
           git push -f origin chore/upstream-refresh
+          existing=$(gh pr list --head chore/upstream-refresh --state open \
+            --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            echo "PR #$existing already open for chore/upstream-refresh"
+            exit 0
+          fi
           gh pr create --head chore/upstream-refresh --base main \
             --title "Re-pin upstream $ver" --label automated \
             --body "Upstream rotated the bytes behind the rolling latest URL. sha256 and size are re-pinned for both architectures and the AppStream release entry updated from the .deb control file.
 
-          Merging is not a rubber stamp. CI installs this payload for real on x86_64 and aarch64 and asserts it launches. If upstream moved app.asar or renamed the binary, those jobs fail and scripts/inspect-deb.sh says what changed." \
-            || echo "PR already open for this branch"
+          Merging is not a rubber stamp. CI installs this payload for real on x86_64 and aarch64 and asserts it launches. If upstream moved app.asar or renamed the binary, those jobs fail and scripts/inspect-deb.sh says what changed."
 
       # GitHub disables scheduled workflows after 60 days of repository
       # inactivity. A bot that silently stops is worse than no bot, and a
