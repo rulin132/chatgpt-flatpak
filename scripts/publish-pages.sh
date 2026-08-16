@@ -41,6 +41,14 @@ EOF
 
 cp build-aux/icons/256.png public/icon.png
 
+# Pages keeps serving the previous deploy for a while after the API reports
+# success. Nothing else on the site can be used to tell the two apart: OSTree
+# checksums are content-derived, so an identical rebuild republishes the same
+# commit id, and a verifier that polls for reachability happily tests the old
+# deploy and reports on bytes that were never published. This stamp is the only
+# thing guaranteed to differ per run.
+echo "${BUILD_ID:-unknown}" > public/build-id
+
 cat > public/index.html <<EOF
 <!doctype html><meta charset=utf-8>
 <title>ChatGPT (unofficial Flatpak)</title>

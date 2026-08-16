@@ -132,8 +132,11 @@ jobs:
           ./scripts/merge-repos.sh repo \
             arch-repos/repo-x86_64/repo arch-repos/repo-aarch64/repo
           # Creates the appstream refs, so it runs before the signing pass.
-          flatpak build-update-repo --gpg-sign="$GPG_KEY_ID" \
-            --generate-static-deltas --prune repo/
+          # No deltas yet: a static delta embeds the commit it was generated
+          # from, so one built before signing hands the client a commit with no
+          # detached metadata, and the install fails "no signatures found" even
+          # though the standalone commit object is signed.
+          flatpak build-update-repo --gpg-sign="$GPG_KEY_ID" repo/
           # build-update-repo signs the summary, not the commits, and
           # merge-repos.sh copies commits verbatim through `ostree pull-local`,
           # which preserves their absent signatures. Without this the remote
@@ -142,7 +145,11 @@ jobs:
           # already verified fine. Signing a signed commit errors, so skip the
           # ones build-update-repo made itself.
           ./scripts/sign-repo.sh repo "$GPG_KEY_ID"
-          flatpak build-update-repo --gpg-sign="$GPG_KEY_ID" repo/
+          # Deltas last, so they carry signed commits, and the summary that
+          # advertises them is regenerated in the same pass.
+          flatpak build-update-repo --gpg-sign="$GPG_KEY_ID" \
+            --generate-static-deltas --prune repo/
+          ./scripts/sign-repo.sh repo "$GPG_KEY_ID"
           echo "published refs:"; ostree --repo=repo refs | grep '^app/'
 
       # No sideload bundle: build-bundle cannot carry an extra-data source
@@ -152,6 +159,7 @@ jobs:
         env:
           GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
           PAGES_URL: https://rulin132.github.io/codex-flatpak
+          BUILD_ID: ${{ github.run_id }}-${{ github.run_attempt }}
         run: ./scripts/publish-pages.sh
 
       - uses: actions/upload-pages-artifact@v3
@@ -250,19 +258,25 @@ jobs:
       - name: install from the published remote
         env:
           REPO_URL: https://rulin132.github.io/codex-flatpak/chatgpt.flatpakrepo
+          STAMP_URL: https://rulin132.github.io/codex-flatpak/build-id
         run: |
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y flatpak
 
-          # Pages keeps serving the old deploy for a short window after the API
-          # reports success, so wait for the URL rather than trusting timing.
-          for _ in $(seq 1 30); do
-            curl -fsS -o /dev/null "$REPO_URL" && break
-            sleep 10
+          # Wait for THIS run's deploy, not merely for a 200. Polling for
+          # reachability passes instantly against the previous deploy, which is
+          # how a green verify job once reported on bytes it never fetched.
+          want="${{ github.run_id }}-${{ github.run_attempt }}"
+          for _ in $(seq 1 40); do
+            got=$(curl -fsS "$STAMP_URL" 2>/dev/null || true)
+            [ "$got" = "$want" ] && break
+            sleep 15
           done
-          curl -fsS -o /dev/null "$REPO_URL" \
-            || { echo "$REPO_URL never became reachable"; exit 1; }
+          [ "${got:-}" = "$want" ] || {
+            echo "Pages still serving '$got', expected '$want' after 10 minutes"
+            exit 1
+          }
 
           flatpak remote-add --user --if-not-exists flathub \
             https://flathub.org/repo/flathub.flatpakrepo
