@@ -72,3 +72,17 @@ jobs:
           else
             echo "last commit was $age days ago, no keepalive needed"
           fi
+
+      # Gated on a repository variable so the pipeline can be stopped from the
+      # GitHub UI in seconds, with no commit and nothing to revert. Unset means
+      # off, so this ships disarmed.
+      - name: auto-merge when the gate is green
+        if: vars.AUTO_UPDATE == 'on'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          num=$(gh pr list --head chore/upstream-refresh --json number --jq '.[0].number // empty')
+          [ -n "$num" ] || { echo "no open refresh PR"; exit 0; }
+          gh pr merge "$num" --auto --squash
+          echo "auto-merge armed on PR #$num; it lands when the required checks pass"
