@@ -43,9 +43,11 @@
     <display_length compare="ge">768</display_length>
   </requires>
 
-  <!-- Rewritten by scripts/sync-version.sh from the upstream .deb control file.
-       flatpak-external-data-checker will NOT bump this by itself, because the
-       rolling URL never changes. -->
+  <!-- Rewritten by scripts/sync-version.sh, which scripts/refresh-source.sh
+       calls with the Version: field of the upstream .deb control file. The
+       nightly update-check.yml job is what runs it. Newest entry first:
+       scripts/ci-smoke.sh asserts the installed payload matches this one, so
+       an out-of-order list fails CI on every architecture. -->
   <releases>
     <release version="26.810.52044" date="2026-08-15"/>
     <release version="26.810.50856" date="2026-08-15"/>

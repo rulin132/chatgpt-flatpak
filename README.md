@@ -58,8 +58,50 @@ make icons                  # replace placeholder icons with the real ones
 make install && make run
 ```
 
-Then set two repository secrets, `GPG_PRIVATE_KEY` and `GPG_KEY_ID`,
-and enable Pages (source: GitHub Actions).
+### Repository setup
+
+None of this is optional, and nothing here is created for you.
+
+**Secrets**
+
+- `GPG_PRIVATE_KEY` and `GPG_KEY_ID`. Flatpak refuses system-wide installs of an
+  extra-data app from a remote that is not gpg-verified, so publishing without
+  these produces a repo nobody can install system-wide.
+- `AUTOMATION_TOKEN`, a personal access token with `contents: write` and
+  `pull-requests: write`. The nightly update check uses it instead of
+  `GITHUB_TOKEN` because GitHub does not start workflow runs for anything
+  `GITHUB_TOKEN` does: a PR opened with it arrives with zero checks. The
+  workflow fails on the first step with a clear message if this is unset.
+
+**Settings**
+
+- Pages, source: GitHub Actions.
+- Make the GHCR package public. A package created by the first push defaults to
+  private, so the `docker://ghcr.io/...` install above returns 401 for everyone
+  until you change it under Packages, package settings, change visibility.
+- Allow auto-merge, under General. Without it the auto-merge step errors out.
+- Branch protection on `main` requiring these four checks: `shellcheck`,
+  `lint`, `build (x86_64, ubuntu-latest)`, `build (aarch64, ubuntu-24.04-arm)`.
+
+**Labels and variables**
+
+- A label named `automated`. `gh pr create --label` errors when the label does
+  not exist, so without it the nightly job opens no PR at all.
+- Repository variable `AUTO_UPDATE`. Unset means off, which is how this ships.
+  Set it to `on` to let the nightly refresh PR auto-merge once those four
+  checks pass, and to let a manifest change on `main` publish a release. Unset
+  it to stop the whole pipeline from the GitHub UI in seconds, with no commit
+  and nothing to revert.
+
+### The nightly refresh
+
+`update-check.yml` runs `scripts/refresh-source.sh` at 04:17 UTC. Upstream
+publishes to a rolling `latest` URL, so the bytes behind our pinned sha256
+rotate with no version change. The job re-pins sha256 and size for both
+architectures, bumps the AppStream release entry from the `.deb` control file,
+and opens a PR on `chore/upstream-refresh` labelled `automated`. If the
+repository has been quiet for 50 days it also commits to `chore/keepalive`,
+because GitHub disables scheduled workflows after 60 days of inactivity.
 
 ## Known issues
 
