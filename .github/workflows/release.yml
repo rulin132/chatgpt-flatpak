@@ -80,6 +80,8 @@ jobs:
   publish:
     needs: build
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ver.outputs.v }}
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
       options: --privileged
@@ -146,18 +148,28 @@ jobs:
         with:
           path: public
 
-      - name: publish OCI image to GHCR
+      # Built here because only this container has flatpak, but pushed from a
+      # separate job. This image ships no registry client at all, no skopeo,
+      # oras, crane, podman or docker, and no package manager to add one. The
+      # inline `skopeo copy` that used to live here had never executed and died
+      # with "skopeo: command not found" the first time it ran.
+      - name: build the OCI image
         run: |
           set -euo pipefail
           flatpak build-bundle --oci --oci-layer-compress=zstd \
             repo oci-image io.github.rulin132.ChatGPT
-          echo "${{ secrets.GITHUB_TOKEN }}" | skopeo login ghcr.io \
-            -u "${{ github.actor }}" --password-stdin
-          skopeo copy --format oci oci:oci-image \
-            "docker://ghcr.io/${{ github.repository_owner }}/chatgpt-flatpak:${{ steps.ver.outputs.v }}"
-          skopeo copy --format oci oci:oci-image \
-            "docker://ghcr.io/${{ github.repository_owner }}/chatgpt-flatpak:latest"
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: oci-image
+          path: oci-image
+          retention-days: 1
+
+      # Cut before the GHCR push, not after. The release is the cheaper thing to
+      # get right and OCI is the optional channel; when the push failed on the
+      # first real run it skipped the release as well, which is the wrong order
+      # of losses.
+      #
       # No files: attached, per the bundle note above. The release is a marker
       # pointing at the repo remote.
       - uses: softprops/action-gh-release@v2
@@ -169,6 +181,34 @@ jobs:
             Install:
                 flatpak remote-add --user chatgpt https://rulin132.github.io/codex-flatpak/chatgpt.flatpakrepo
                 flatpak install --user chatgpt io.github.rulin132.ChatGPT
+
+  # Plain ubuntu-latest, not the flatpak container, because that container has no
+  # registry client and no package manager to install one. Runs after publish, so
+  # a failure here costs only the OCI channel: Pages and the release are done.
+  ghcr:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: oci-image
+          path: oci-image
+
+      - name: push to GHCR
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y skopeo
+          echo "${{ secrets.GITHUB_TOKEN }}" | skopeo login ghcr.io \
+            -u "${{ github.actor }}" --password-stdin
+          for tag in "${{ needs.publish.outputs.version }}" latest; do
+            skopeo copy --format oci oci:oci-image \
+              "docker://ghcr.io/${{ github.repository_owner }}/chatgpt-flatpak:$tag"
+          done
+          echo "a newly created GHCR package is private; make it public in the"
+          echo "package settings or anonymous pulls get 401"
 
   deploy-pages:
     needs: publish
