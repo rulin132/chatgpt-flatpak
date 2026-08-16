@@ -1,11 +1,15 @@
 name: release
 
-# Tag or manual dispatch ONLY. This used to fire on pushes to main touching the
-# manifest or build-aux/, which is most packaging work, and the first release
-# permanently fixes the app id and remote URL for everyone who installs from it.
+# Tags stay for human-cut releases. The manifest path trigger is what makes the
+# pipeline reach users: upstream can rotate bytes without changing Version, so a
+# tag-only scheme would collide on an existing tag and skip a payload users
+# need. Publishing on content change handles that; the kill switch gates it.
 on:
   push:
     tags: ['v*']
+    branches: [main]
+    paths:
+      - 'io.github.rulin132.ChatGPT.yaml'
   workflow_dispatch:
 
 permissions:
@@ -20,6 +24,10 @@ concurrency:
 
 jobs:
   build:
+    if: >-
+      startsWith(github.ref, 'refs/tags/') ||
+      github.event_name == 'workflow_dispatch' ||
+      vars.AUTO_UPDATE == 'on'
     strategy:
       fail-fast: false
       matrix:
