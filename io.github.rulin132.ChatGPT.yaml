@@ -36,12 +36,10 @@ finish-args:
   - --talk-name=org.kde.StatusNotifierWatcher
   # Notifications go through the portal, no talk-name needed since BaseApp 23.08.
   #
-  # The app hardcodes ~/.codex and ~/.cache, ignoring XDG_CACHE_HOME, and on
-  # first launch downloads a Codex "primary runtime" bundle into them (~67s).
-  # $HOME is a throwaway tmpfs in a sealed sandbox, so without these it repeats
-  # that download on every single start. --persist does NOT widen the sandbox:
-  # each one binds a subdirectory of ~/.var/app/io.github.rulin132.ChatGPT/ into
-  # the sandbox $HOME. No host path becomes visible.
+  # The app hardcodes ~/.codex and ~/.cache, ignoring XDG_CACHE_HOME, and
+  # re-downloads its Codex runtime (~67s) on every start without these, because
+  # $HOME is a throwaway tmpfs. --persist does NOT widen the sandbox: it binds
+  # subdirectories of ~/.var/app/<id>/. No host path becomes visible.
   - --persist=.codex
   - --persist=.cache
   - --env=ELECTRON_TRASH=gio

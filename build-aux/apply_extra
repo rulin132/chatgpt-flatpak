@@ -76,22 +76,12 @@ mv ./app.tmp ./app
 printf 'APP_BIN=/app/extra/app/%s\n' "$BIN_NAME" > app.env
 
 # --- 5. check the Chromium sandbox ------------------------------------------
-# Electron's SUID helper cannot work inside flatpak. zypak (from
-# org.electronjs.Electron2.BaseApp) intercepts the sandbox calls instead and
-# runs each renderer in a nested flatpak sub-sandbox. That is what keeps
-# renderer processes isolated. The alternative the other repackagers chose is
-# --no-sandbox, which drops renderer isolation entirely.
-#
-# Upstream ships no chrome-sandbox: on the .deb it relies on unprivileged user
-# namespaces (hence its /etc/apparmor.d/chatgpt profile), which are not
-# available to us inside bubblewrap. Nothing needs to be stubbed out, because zypak
-# takes over before Chromium looks for a helper. Verified on 26.810.50856: the
-# zygote runs under `bwrap ... zypak-helper child`.
-#
-# So this step asserts rather than installs. Both branches are load-bearing:
-# without zypak the launcher cannot isolate anything, and a chrome-sandbox
-# appearing upstream means the sandbox model changed and a human has to decide
-# what that means before we ship it.
+# Asserts rather than installs. Upstream ships no chrome-sandbox and the
+# BaseApp ships no stub_sandbox; zypak takes over before Chromium looks for a
+# helper. Verified on 26.810.50856: the zygote runs under
+# `bwrap ... zypak-helper child`. Both checks are load-bearing. Without zypak
+# nothing is isolated, and a chrome-sandbox appearing upstream means their
+# sandbox model changed and a human has to look before we ship it.
 [ -x /app/bin/zypak-wrapper ] \
     || die "zypak-wrapper missing from the Electron BaseApp, refusing to install an app whose renderers would be unsandboxed"
 
@@ -101,7 +91,7 @@ fi
 
 # --- 6. fix the Wayland window icon / .desktop association ------------------
 # Electron reports "{productName}.desktop"; ours is io.github.rulin132.ChatGPT.
-# Cosmetic only: warn, do not abort, if upstream changes the asar format.
+# Cosmetic, so warn rather than abort if the asar format changes.
 if command -v patch-electron-desktop-filename >/dev/null 2>&1; then
     patch-electron-desktop-filename \
         --desktop-filename io.github.rulin132.ChatGPT \
@@ -110,9 +100,8 @@ if command -v patch-electron-desktop-filename >/dev/null 2>&1; then
 fi
 
 # --- 7. in-app updater ------------------------------------------------------
-# Checked against 26.810.50856: the app logs `enableSparkle=false
-# enableUpdater=true` at startup but never tries to write to /app. There is no
-# Squirrel or AppImage updater in the payload. Nothing to neuter here.
+# Nothing to neuter. Checked against 26.810.50856: it logs enableUpdater=true
+# but never writes to /app, and ships no Squirrel or AppImage updater.
 #
 # What it does do is download a "primary runtime" bundle into $HOME on first
 # launch. That is a separate mechanism, it lands in the app's own data, and it

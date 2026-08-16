@@ -11,23 +11,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Not in the flatpak container: it has neither dnf nor shellcheck, so the old
-  # `dnf install -y ShellCheck || true` masked its own failure and the next line
-  # died with "shellcheck: command not found". The ubuntu runner image ships
-  # shellcheck. Runs the unit tests too, since they need nothing else.
+  # Not in the flatpak container: it ships neither dnf nor shellcheck.
   shellcheck:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # The version matters: the runner's shellcheck is older than a typical
-      # local one and still reports SC2015 for `A && B || C`. Without printing
-      # it, a green local run and a red CI run look identical.
+      # Print the version: the runner's is older than a typical local one and
+      # still flags SC2015, so green locally and red here look identical.
       - run: shellcheck --version && shellcheck -x scripts/*.sh tests/*.sh build-aux/apply_extra build-aux/launcher.sh
       - run: tests/test-sync-version.sh
 
-  # Gating again. appid-url-not-reachable is excepted by name in
-  # flatpak-builder-lint-exceptions.json, so this passes, and every other lint
-  # error still fails the run.
   lint:
     runs-on: ubuntu-latest
     container:
@@ -35,32 +28,20 @@ jobs:
       options: --privileged
     steps:
       - uses: actions/checkout@v4
-      # Call the binary the image ships, NOT `flatpak run org.flatpak.Builder`.
-      # The original one-liner used the latter and died with
-      # "app/org.flatpak.Builder/x86_64/master not installed"; installing that
-      # flatpak does not help either, because flatpak-builder-lint shells out to
-      # flatpak-builder, which then cannot create its .flatpak-builder state dir
-      # in the runner workspace from inside the Builder sandbox:
-      # "Permission denied". If a future image drops the binary this fails loudly
-      # with "command not found", which is the honest failure.
-      #
-      # Locally there is no bare binary, so `make lint` uses the flatpak form.
-      # That works because the checkout is under $HOME, which the sandbox can write.
-      #
-      # --exceptions switches the mechanism on. --user-exceptions on its own is
-      # silently inert: the whole exceptions block is gated on the former.
+      # The bare binary, NOT `flatpak run org.flatpak.Builder`: that form cannot
+      # create .flatpak-builder in the runner workspace from inside the sandbox
+      # and dies on Permission denied. `make lint` uses the flatpak form because
+      # locally the checkout is under $HOME, which the sandbox can write.
+      # --exceptions is required; --user-exceptions alone is silently inert.
       - name: manifest lint
         run: |
           flatpak-builder-lint --exceptions \
             --user-exceptions flatpak-builder-lint-exceptions.json \
             manifest io.github.rulin132.ChatGPT.yaml
 
-  # Deliberately does NOT depend on lint or shellcheck. The smoke test below is
-  # the only thing that catches upstream layout drift before it reaches users,
-  # and gating it on the linters would have meant it never ran at all: the
-  # manifest lint currently fails on appid-url-not-reachable, which is tied to
-  # an unresolved app-id decision, and the shellcheck job was failing outright.
-  # A style or naming problem must not be able to hide a broken payload.
+  # No `needs:`. The smoke test is the only thing catching upstream layout
+  # drift, and a style or naming problem must not be able to hide a broken
+  # payload. Gating it on the linters is how it came to never run at all.
   build:
     strategy:
       fail-fast: false
@@ -77,14 +58,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Built into a local OSTree repo, not a bundle: `flatpak build-bundle`
-      # cannot carry an extra-data source (flatpak#1334), so a bundle has no
-      # payload and cannot be installed. A repo remote reads the extra-data
-      # source from commit metadata and works.
-      #
-      # The vendor payload is extra-data: it is fetched at install time, so the
-      # build itself never touches persistent.oaistatic.com. Only the smoke
-      # test below does.
+      # A repo, not a bundle: build-bundle cannot carry extra-data
+      # (flatpak#1334), so its .flatpak has no payload. Extra-data is fetched at
+      # install time, so only the smoke test touches persistent.oaistatic.com.
       - name: build
         run: |
           set -euo pipefail
@@ -93,11 +69,8 @@ jobs:
             --disable-rofiles-fuse --arch=${{ matrix.arch }} \
             --repo=repo build io.github.rulin132.ChatGPT.yaml
 
-      # Real install exercises apply_extra, the only place upstream layout
-      # changes can bite. This is the check that catches a rotated .deb whose
-      # internals moved, which a manifest lint cannot see. It is the only thing
-      # standing between upstream layout drift and users, so it must actually
-      # run: assert the payload arrived rather than trusting a zero exit.
+      # A real install is the only thing that exercises apply_extra, so assert
+      # the payload arrived rather than trusting a zero exit.
       - name: smoke test (install + apply_extra)
         if: matrix.arch == 'x86_64'
         run: |

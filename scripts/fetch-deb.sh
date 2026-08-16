@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
-# Fetch the upstream .deb into .cache/ and print its path.
-#
-# The payload is ~400 MB and three maintainer scripts want it, so cache it and
-# let curl's conditional GET decide whether the rolling URL has moved.
-# .cache/ is gitignored; nothing in it is ever committed.
+# Fetch the upstream .deb into .cache/ (gitignored) and print its path.
+# ~400 MB and three scripts want it, so -z lets a conditional GET decide
+# whether the rolling URL has actually moved.
 #
 # Usage: scripts/fetch-deb.sh [amd64|arm64]
 set -euo pipefail

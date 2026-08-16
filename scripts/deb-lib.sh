@@ -1,15 +1,7 @@
 # shellcheck shell=bash
-# Read a .deb without dpkg-deb.
-#
-# The distributions this package exists for (Silverblue, Aeon, NixOS, Alpine)
-# do not ship dpkg. Every maintainer script here has to work with ar + tar only.
-#
-# GNU tar refuses to auto-detect compression on a non-seekable stream, so the
-# member's own extension picks the decompressor. An extension we do not know is
-# a hard error, not a guess: a silently-unread payload is how a maintainer ends
-# up publishing a manifest that describes bytes nobody looked at.
+# Read a .deb without dpkg-deb, which Silverblue, Aeon, NixOS and Alpine do not
+# ship. ar + tar only.
 
-# deb_member <deb> <prefix>   -> the ar member starting with <prefix>
 deb_member() {
     local m
     m=$(ar t "$1" | grep "^$2" | head -n1)
@@ -17,7 +9,8 @@ deb_member() {
     echo "$m"
 }
 
-# deb_cat <deb> <member>      -> that member, decompressed, on stdout
+# Compression comes from the member extension because GNU tar refuses to detect
+# it on a non-seekable stream. Unknown extension is a hard error, not a guess.
 deb_cat() {
     case "$2" in
         *.tar.xz)  ar p "$1" "$2" | xz -dc ;;
@@ -28,16 +21,10 @@ deb_cat() {
     esac
 }
 
-# deb_control <deb>           -> the control file on stdout
 deb_control() {
     deb_cat "$1" "$(deb_member "$1" control.tar)" | tar xO ./control
 }
 
-# deb_version <deb>           -> the upstream version string
 deb_version() {
     deb_control "$1" | sed -n 's/^Version:[[:space:]]*//p'
 }
-
-# The data member has one reader each for listing and extracting, so both do
-# `deb_cat "$deb" "$(deb_member "$deb" data.tar)" | tar ...` at the call site
-# rather than wrapping it here.

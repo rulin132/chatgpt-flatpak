@@ -3,14 +3,12 @@ MANIFEST := $(APP_ID).yaml
 REPO     ?= repo
 BUILDDIR ?= build
 LOCAL_REMOTE ?= $(APP_ID)-local
-# --exceptions is what switches the mechanism on at all; --user-exceptions
-# alone is silently inert. CI uses the same pair, so local and CI agree.
+# --exceptions is required; --user-exceptions alone is silently inert.
 LINT_EXCEPTIONS := flatpak-builder-lint-exceptions.json
 GPG_KEY  ?=
 GPG_ARGS := $(if $(GPG_KEY),--gpg-sign=$(GPG_KEY),)
 
-# The distros this package exists for cannot layer flatpak-builder, so fall
-# back to the org.flatpak.Builder flatpak that `make deps` installs.
+# The distros this exists for cannot layer flatpak-builder.
 FB := $(shell command -v flatpak-builder 2>/dev/null || echo 'flatpak run org.flatpak.Builder')
 
 .PHONY: help rename deps hashes icons inspect lint build install run bundle repo oci clean distclean
@@ -62,15 +60,10 @@ build:
 	$(FB) --user --install-deps-from=flathub --force-clean \
 	  --disable-rofiles-fuse --repo=$(REPO) $(GPG_ARGS) $(BUILDDIR) $(MANIFEST)
 
-# Installing must happen outside the builder: apply_extra runs under bwrap, and
-# bwrap cannot create a nested user namespace from inside the org.flatpak.Builder
-# sandbox ("No permissions to create a new namespace").
-#
-# It also has to go through a remote rather than `build-bundle`. flatpak-builder
-# records the extra-data source in the commit metadata, but `flatpak build-bundle`
-# only copies it from *detached* metadata, so the bundle comes out with no
-# vendor payload at all and installing it dies with "Extra data missing in
-# detached metadata". Pulling from a repo reads the commit metadata and works.
+# Outside the builder, and via a remote. apply_extra runs under bwrap, which
+# cannot nest a user namespace inside the org.flatpak.Builder sandbox. And
+# build-bundle reads extra-data only from detached metadata, so its bundle has
+# no payload; a repo remote reads it from the commit metadata and works.
 install: build
 	flatpak remote-add --user --if-not-exists --no-gpg-verify $(LOCAL_REMOTE) $(CURDIR)/$(REPO)
 	flatpak install --user -y --reinstall $(LOCAL_REMOTE) $(APP_ID)
@@ -78,8 +71,7 @@ install: build
 run:
 	flatpak run $(APP_ID)
 
-# Kept as a tombstone so `make bundle` explains itself instead of failing with
-# "No rule to make target", and so nobody re-adds it from muscle memory.
+# A tombstone, so the target explains itself instead of "No rule to make target".
 bundle:
 	@echo "make bundle: removed, build-bundle cannot carry extra-data (flatpak#1334)."
 	@echo "Use 'make install' locally, or the repo remote to distribute."
