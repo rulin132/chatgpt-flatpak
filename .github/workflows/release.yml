@@ -19,13 +19,59 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+
+      # Unsigned here. Signing happens once, in publish, so the key touches one
+      # job rather than every matrix leg.
+      - name: build
+        run: |
+          set -euo pipefail
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak-builder --user --install-deps-from=flathub --force-clean \
+            --disable-rofiles-fuse --arch=${{ matrix.arch }} \
+            --repo=repo build io.github.rulin132.ChatGPT.yaml
+
+      # Same gate as build.yml. A release must not publish bytes that were never
+      # installed, which is how the tag path used to work.
+      - name: smoke test
+        run: |
+          set -euo pipefail
+          flatpak remote-add --user --if-not-exists --no-gpg-verify chatgpt-rel "$PWD/repo"
+          flatpak install --user -y chatgpt-rel io.github.rulin132.ChatGPT
+          scripts/ci-smoke.sh io.github.rulin132.ChatGPT
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: repo-${{ matrix.arch }}
+          path: repo
+          retention-days: 1
+
   publish:
+    needs: build
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
       options: --privileged
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: arch-repos
 
       - name: read version
         id: ver
@@ -55,19 +101,16 @@ jobs:
           echo "$GPG_PRIVATE_KEY" | gpg --batch --import
           echo "GNUPGHOME=$GNUPGHOME" >> "$GITHUB_ENV"
 
-      - name: build + sign repo
+      # Named `repo` because publish-pages.sh copies that path unchanged.
+      - name: merge and sign
         env:
           GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
         run: |
           set -euo pipefail
-          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-          flatpak-builder --user --install-deps-from=flathub --force-clean \
-            --disable-rofiles-fuse --disable-updates \
-            --gpg-sign="$GPG_KEY_ID" --repo=repo build io.github.rulin132.ChatGPT.yaml
-          # Static deltas matter here: archive-z2 is one HTTP request per file,
-          # which is brutal against Pages.
+          ./scripts/merge-repos.sh repo arch-repos/repo-x86_64 arch-repos/repo-aarch64
           flatpak build-update-repo --gpg-sign="$GPG_KEY_ID" \
             --generate-static-deltas --prune repo/
+          echo "published refs:"; ostree --repo=repo refs | grep '^app/'
 
       # No sideload bundle: build-bundle cannot carry an extra-data source
       # (flatpak#1334), so the .flatpak it produces has no application in it.
@@ -81,7 +124,6 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: public
-
 
       - name: publish OCI image to GHCR
         run: |
