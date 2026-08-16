@@ -21,7 +21,28 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
+      # GitHub's recursion guard: nothing GITHUB_TOKEN does creates a workflow
+      # run. A PR opened with it gets zero checks, so with AUTO_UPDATE on it
+      # either waits forever on contexts that never report, or merges against
+      # no CI at all. A PAT in AUTOMATION_TOKEN is what makes build.yml run on
+      # the bot's PR. Checked before checkout so an unset secret is one clear
+      # message and not a confusing clone failure.
+      - name: require an automation token
+        env:
+          AUTOMATION_TOKEN: ${{ secrets.AUTOMATION_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "$AUTOMATION_TOKEN" ]; then
+            echo "AUTOMATION_TOKEN is not set." >&2
+            echo "Add a repository secret holding a personal access token with" >&2
+            echo "contents:write and pull-requests:write. GITHUB_TOKEN cannot be" >&2
+            echo "used here: PRs it opens never trigger any workflow." >&2
+            exit 1
+          fi
+
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.AUTOMATION_TOKEN }}
 
       - name: re-pin upstream
         run: |
@@ -32,7 +53,7 @@ jobs:
 
       - name: open a PR if anything changed
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.AUTOMATION_TOKEN }}
         run: |
           set -euo pipefail
           if git diff --quiet; then
@@ -59,19 +80,30 @@ jobs:
       # GitHub disables scheduled workflows after 60 days of repository
       # inactivity. A bot that silently stops is worse than no bot, and a
       # commit is the only thing that counts as activity.
+      #
+      # The commit lands on chore/keepalive, not main. main has branch
+      # protection with required checks, so a push there is rejected outright
+      # and the keepalive would guarantee the very outcome it exists to stop.
+      # A commit anywhere in the repository counts. Never force-pushed: the
+      # branch is created from main once, then extended.
       - name: keep the schedule armed
         run: |
           set -euo pipefail
           age=$(( ( $(date +%s) - $(git log -1 --format=%ct origin/main) ) / 86400 ))
-          if [ "$age" -ge 50 ]; then
-            git checkout main
-            date -u +%Y-%m-%dT%H:%M:%SZ > .github/last-upstream-check
-            git add .github/last-upstream-check
-            git commit -m "Keep the scheduled upstream check armed"
-            git push origin main
-          else
+          if [ "$age" -lt 50 ]; then
             echo "last commit was $age days ago, no keepalive needed"
+            exit 0
           fi
+          if git ls-remote --exit-code --heads origin chore/keepalive >/dev/null 2>&1; then
+            git fetch --depth=1 origin chore/keepalive
+            git checkout -B chore/keepalive FETCH_HEAD
+          else
+            git checkout -B chore/keepalive origin/main
+          fi
+          date -u +%Y-%m-%dT%H:%M:%SZ > .github/last-upstream-check
+          git add .github/last-upstream-check
+          git commit -m "Keep the scheduled upstream check armed"
+          git push origin chore/keepalive
 
       # Gated on a repository variable so the pipeline can be stopped from the
       # GitHub UI in seconds, with no commit and nothing to revert. Unset means
@@ -79,10 +111,17 @@ jobs:
       - name: auto-merge when the gate is green
         if: vars.AUTO_UPDATE == 'on'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.AUTOMATION_TOKEN }}
         run: |
           set -euo pipefail
-          num=$(gh pr list --head chore/upstream-refresh --json number --jq '.[0].number // empty')
+          # Author and label as well as the branch name. On the branch alone,
+          # anyone who can open a PR from a branch called chore/upstream-refresh
+          # gets it auto-merged the moment checks pass, which walks straight
+          # past the human merge gate. @me is the automation token's own user,
+          # so this only ever matches a PR this workflow opened.
+          num=$(gh pr list --head chore/upstream-refresh --state open \
+            --author "@me" --label automated \
+            --json number --jq '.[0].number // empty')
           [ -n "$num" ] || { echo "no open refresh PR"; exit 0; }
           gh pr merge "$num" --auto --squash
           echo "auto-merge armed on PR #$num; it lands when the required checks pass"
