@@ -78,17 +78,4 @@ jobs:
           set -euo pipefail
           flatpak remote-add --user --if-not-exists --no-gpg-verify chatgpt-ci "$PWD/repo"
           flatpak install --user -y chatgpt-ci io.github.rulin132.ChatGPT
-
-          version=$(flatpak run --command=cat io.github.rulin132.ChatGPT /app/extra/VERSION)
-          echo "apply_extra reported upstream version: $version"
-          test -n "$version" && test "$version" != unknown
-
-          flatpak run --command=sh io.github.rulin132.ChatGPT -c '
-            set -eu
-            test -f /app/extra/app.env || { echo "no app.env"; exit 1; }
-            . /app/extra/app.env
-            test -x "$APP_BIN" || { echo "APP_BIN not executable: $APP_BIN"; exit 1; }
-            head -c4 "$APP_BIN" | grep -q ELF || { echo "APP_BIN is not an ELF binary"; exit 1; }
-            test -f /app/extra/app/resources/app.asar || { echo "no app.asar"; exit 1; }
-            echo "payload OK: $APP_BIN"
-          '
+          scripts/ci-smoke.sh io.github.rulin132.ChatGPT
