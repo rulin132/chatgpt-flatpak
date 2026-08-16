@@ -19,6 +19,14 @@ OUT=build-aux/icons
 DEB=$(scripts/fetch-deb.sh amd64)
 WORK=$(mktemp -d); trap 'rm -rf "$WORK"' EXIT
 
+# ImageMagick 7 ships `magick`, 6 ships `convert`. Both accept the flags below.
+# Resolved before anything is deleted: on a host with neither, failing here
+# leaves the committed icons alone rather than wiping them.
+if command -v magick >/dev/null 2>&1; then IM=magick
+elif command -v convert >/dev/null 2>&1; then IM=convert
+else echo "extract-icons: needs ImageMagick (magick or convert)" >&2; exit 1
+fi
+
 # Clear first. The downscale loop below skips any size that already exists, so
 # with every size committed this script was a no-op and an upstream icon change
 # would silently keep the old ones.
@@ -47,7 +55,7 @@ for s in $SIZES; do
   # into every PNG, which leaks the build time and makes the icons
   # irreproducible. -strip alone does not stop it; the date chunks are added
   # back at write time, so exclude them explicitly.
-  magick "$big" -resize "${s}x${s}" -strip -define png:exclude-chunk=date,time "$OUT/$s.png"
+  "$IM" "$big" -resize "${s}x${s}" -strip -define png:exclude-chunk=date,time "$OUT/$s.png"
   echo "  ${s}x${s} <- downscaled from ${big#"$WORK"}"
 done
 
