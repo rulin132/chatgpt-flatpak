@@ -158,7 +158,7 @@ jobs:
       - name: assemble Pages site
         env:
           GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
-          PAGES_URL: https://rulin132.github.io/codex-flatpak
+          PAGES_URL: https://rulin132.github.io/chatgpt-flatpak
           BUILD_ID: ${{ github.run_id }}-${{ github.run_attempt }}
         run: ./scripts/publish-pages.sh
 
@@ -197,7 +197,7 @@ jobs:
             Packaging build for upstream ChatGPT ${{ steps.ver.outputs.v }}.
 
             Install:
-                flatpak remote-add --user chatgpt https://rulin132.github.io/codex-flatpak/chatgpt.flatpakrepo
+                flatpak remote-add --user chatgpt https://rulin132.github.io/chatgpt-flatpak/chatgpt.flatpakrepo
                 flatpak install --user chatgpt io.github.rulin132.ChatGPT
 
   # Plain ubuntu-latest, not the flatpak container, because that container has no
@@ -257,8 +257,8 @@ jobs:
 
       - name: install from the published remote
         env:
-          REPO_URL: https://rulin132.github.io/codex-flatpak/chatgpt.flatpakrepo
-          STAMP_URL: https://rulin132.github.io/codex-flatpak/build-id
+          REPO_URL: https://rulin132.github.io/chatgpt-flatpak/chatgpt.flatpakrepo
+          STAMP_URL: https://rulin132.github.io/chatgpt-flatpak/build-id
         run: |
           set -euo pipefail
           sudo apt-get update

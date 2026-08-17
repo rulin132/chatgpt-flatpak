@@ -23,7 +23,7 @@ the people it is not.
 ## Install
 
 ```sh
-flatpak remote-add --user chatgpt https://rulin132.github.io/codex-flatpak/chatgpt.flatpakrepo
+flatpak remote-add --user chatgpt https://rulin132.github.io/chatgpt-flatpak/chatgpt.flatpakrepo
 flatpak install --user chatgpt io.github.rulin132.ChatGPT
 ```
 

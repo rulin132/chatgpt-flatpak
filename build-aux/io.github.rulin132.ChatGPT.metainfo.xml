@@ -32,7 +32,7 @@
 
   <launchable type="desktop-id">io.github.rulin132.ChatGPT.desktop</launchable>
   <url type="homepage">https://openai.com/codex/</url>
-  <url type="bugtracker">https://github.com/rulin132/codex-flatpak/issues</url>
+  <url type="bugtracker">https://github.com/rulin132/chatgpt-flatpak/issues</url>
 
   <content_rating type="oars-1.1">
     <content_attribute id="social-chat">intense</content_attribute>

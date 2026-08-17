@@ -4,7 +4,7 @@
 set -euo pipefail
 
 : "${GPG_KEY_ID:?set GPG_KEY_ID}"
-PAGES_URL=${PAGES_URL:?set PAGES_URL, e.g. https://rulin132.github.io/codex-flatpak}
+PAGES_URL=${PAGES_URL:?set PAGES_URL, e.g. https://rulin132.github.io/chatgpt-flatpak}
 # basename, not `ls | sed`: the old form left the glob's "./" on the front, so
 # the .flatpakref shipped Name=./io.github.rulin132.ChatGPT.
 manifests=(./*.ChatGPT.yaml)
