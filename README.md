@@ -1,10 +1,24 @@
 # ChatGPT / Codex Desktop Flatpak
 
-This repo packages the **official** ChatGPT / Codex Linux build as a Flatpak, so
-you can run it on any distribution, not just the Red Hat and Debian based ones
-OpenAI ships packages for. That means Fedora atomic (Silverblue, Bluefin,
-Bazzite, Aurora, Kinoite) · openSUSE Aeon/MicroOS · Arch · NixOS · Alpine ·
-Gentoo · Steam Deck · basically any immutable host.
+This repo packages the **official** ChatGPT / Codex Linux build as a Flatpak
+that starts with no access to your files, and gives it back one directory at a
+time. Codex executes code. This exists so the thing running commands cannot
+read `~/.ssh`, `~/.aws`, your browser profiles or your work repos unless you
+say so.
+
+**It trades ease of use for that, and the trade is real.** You configure what it
+can see, the desktop avatar does not render, and it is not on your `PATH`. If
+you want the app rather than the confinement, install it on the host instead.
+On Bluefin, Bazzite and Aurora that is one command, it updates itself, and there
+is nothing to configure:
+
+```sh
+brew install --cask ublue-os/experimental-tap/chatgpt-linux
+```
+
+That unpacks OpenAI's rpm into `~/.local` and runs it as you, with your full
+user rights. For most people that is the right answer. Everything below is for
+the people it is not.
 
 ## Install
 
@@ -40,9 +54,22 @@ Sealed by default: no `--filesystem=host`, no
 or run commands on your host until you grant it.
 
 Renderers stay isolated under zypak rather than `--no-sandbox`, which is what
-the other Linux repackagers of this app use. `--no-sandbox` does not disable
+the other Flatpak repackagings of this app use. `--no-sandbox` does not disable
 "a" sandbox, it removes renderer isolation entirely, so any compromised web
 content inherits every permission the flatpak holds.
+
+Go further and deny X11 outright. `--socket=fallback-x11` only grants X11 when
+there is no Wayland, so on a Wayland session it is already unused; denying it
+means an X11 session, or a change in how the launcher picks its backend, cannot
+hand X11 back. X11 is a shared server, where any client can read other clients'
+input and window contents.
+
+```sh
+flatpak override --user --nosocket=x11 --nosocket=fallback-x11 io.github.rulin132.ChatGPT
+```
+
+The app runs and authenticates normally with both denied. The cost is that on an
+X11-only machine it will not start at all.
 
 Review or undo what you have granted:
 
@@ -110,6 +137,13 @@ and opens a PR on `chore/upstream-refresh` labelled `automated`. If the
 repository has been quiet for 50 days it also commits to `chore/keepalive`,
 because GitHub disables scheduled workflows after 60 days of inactivity.
 
+This is more work than it needs to be, and the rotation it chases is
+self-inflicted. Upstream also publishes a real APT repository, with versioned
+paths under `pool/` and a `Packages` index carrying `Version`, `Size` and
+`SHA256` for each architecture. Pinning the versioned URL means the bytes behind
+a hash cannot change, and the index supplies the hashes without downloading
+750 MB of `.deb` to compute them. Moving to it is the next change here.
+
 ## Known issues
 
 If something misbehaves, capture the log first:
@@ -124,15 +158,13 @@ not composite window transparency on the Wayland Ozone backend. Measured against
 26.810.52044: broken on Wayland, broken on Wayland with Vulkan disabled, correct
 on XWayland. It is an upstream platform bug, not something this packaging causes.
 
-If it bothers you, opt into XWayland per-install:
-
-```sh
-flatpak override --user --socket=x11 io.github.rulin132.ChatGPT
-```
-
-That is a real trade, not a free fix. XWayland costs you native Wayland scaling
-and input handling, and X11 is a shared server, so the app can observe other X11
-clients. Revert with `--nosocket=x11`.
+**Accept it.** XWayland renders the pet correctly, and earlier versions of this
+document suggested reaching for it. That was bad advice: it costs you native
+Wayland scaling and input handling, and X11 is a shared server, so the app can
+watch other X11 clients' input and windows. Trading that away for a decorative
+overlay is a poor bargain in a package whose entire purpose is confinement. If
+you want the pet, install it on the host with the cask; if you want the sandbox,
+the pet does not draw.
 
 **Do not "fix" this by adding `--socket=x11` to the manifest.** The launcher
 passes `--ozone-platform-hint=auto`, and this Electron prefers X11 whenever
