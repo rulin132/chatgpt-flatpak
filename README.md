@@ -26,8 +26,8 @@ flatpak straight at `docker://` returns 401, because it does not complete the
 anonymous token exchange GHCR requires, even though the package is public.
 
 ```sh
-skopeo copy docker://ghcr.io/rulin132/chatgpt-flatpak:latest oci:chatgpt-oci:latest
-flatpak install --user --image oci:chatgpt-oci:latest
+skopeo copy docker://ghcr.io/rulin132/chatgpt-flatpak:latest oci:oci-chatgpt:latest
+flatpak install --user --image oci:oci-chatgpt:latest
 ```
 
 That image is 3 MB. It carries the packaging alone; the application itself is
