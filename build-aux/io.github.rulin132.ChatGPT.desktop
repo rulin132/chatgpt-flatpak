@@ -6,6 +6,7 @@ Comment=ChatGPT, Work and Codex desktop app
 Exec=chatgpt-launcher %U
 Icon=io.github.rulin132.ChatGPT
 Terminal=false
+StartupNotify=true
 StartupWMClass=ChatGPT
 Categories=Network;Development;Utility;
 Keywords=chatgpt;openai;codex;ai;assistant;
