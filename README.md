@@ -20,11 +20,18 @@ for example your Desktop:
 flatpak override --user --filesystem=~/Desktop io.github.rulin132.ChatGPT
 ```
 
-Also available as an OCI image at `ghcr.io/rulin132/chatgpt-flatpak`
+Also published as an OCI image at `ghcr.io/rulin132/chatgpt-flatpak`, for
+mirroring and offline installs. Fetch it with a registry client first: pointing
+flatpak straight at `docker://` returns 401, because it does not complete the
+anonymous token exchange GHCR requires, even though the package is public.
 
 ```sh
-flatpak install --user --image docker://ghcr.io/rulin132/chatgpt-flatpak:latest
+skopeo copy docker://ghcr.io/rulin132/chatgpt-flatpak:latest oci:chatgpt-oci:latest
+flatpak install --user --image oci:chatgpt-oci:latest
 ```
+
+That image is 3 MB. It carries the packaging alone; the application itself is
+still downloaded from OpenAI at install time, exactly as with the repo above.
 
 ## Sandbox
 
