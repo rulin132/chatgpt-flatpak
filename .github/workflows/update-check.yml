@@ -1,16 +1,7 @@
 name: update-check
 
-# Watch upstream's APT index and re-pin when a new version appears. The
-# manifest pins versioned pool/ URLs, so an upstream release does not corrupt
-# existing pins; it eventually deletes the old .deb from pool/, at which point
-# installs 404 until the re-pin this job opens has landed. The job is the
-# difference between that window being hours and being however long it takes
-# someone to notice.
-#
-# First-party on purpose. The previous version used three marketplace actions
-# and never ran: its only execution failed at "Set up job" with "Repository
-# access blocked" before any step of its own. scripts/refresh-source.sh already
-# does the whole re-pin, so nothing here needs a third party.
+# Watch upstream's APT index and open a re-pin PR when a new version appears.
+# Old pool/ files eventually 404, so this keeps that window short.
 
 on:
   schedule:

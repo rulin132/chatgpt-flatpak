@@ -1,12 +1,6 @@
 #!/usr/bin/env bash
-# Re-pin the manifest from upstream's APT index.
-#
-# Upstream runs a real APT repository: dists/stable/main/binary-{amd64,arm64}/
-# Packages carries Version, Filename, Size and SHA256 for each arch, and the
-# Filename points into pool/ where the path is versioned. Reading the index
-# replaces the previous approach of downloading both ~380 MB .debs nightly to
-# hash them, and pinning versioned pool/ URLs means the bytes behind a pin can
-# never change out from under it, which is what the rolling latest/ URL did.
+# Re-pin the manifest from upstream's APT index: url, sha256 and size for both
+# arches come from dists/stable/main/binary-*/Packages.
 #
 # Usage: scripts/refresh-source.sh [manifest.yaml]
 set -euo pipefail
@@ -18,8 +12,7 @@ manifests=(./*.ChatGPT.yaml)
 MANIFEST=${1:-${manifests[0]}}
 
 # stdin: a Packages index. stdout: "version filename size sha256" for the
-# newest chatgpt stanza. An APT index may list several versions of a package;
-# sort -V picks the highest rather than trusting stanza order.
+# newest chatgpt stanza (an index may list several versions).
 parse_index() {
     awk -v RS= -v FS='\n' '{
         v = f = s = h = ""; pkg = 0
@@ -37,11 +30,8 @@ parse_index() {
 declare -A ARCHES=([x86_64]=amd64 [aarch64]=arm64)
 declare -A STANZAS=()
 
-# Fetch and parse both indexes before writing anything. Upstream publishes the
-# arches separately, so mid-publish they can briefly disagree; pinning a
-# half-published release would fail ci-smoke on one arch with nothing to heal
-# it until the next run. Failing before the first write means the manifest is
-# never left with mixed pins and the nightly just retries tomorrow.
+# Read both indexes before writing anything: the arches publish separately and
+# can briefly disagree, and a mixed pin must never reach the manifest.
 for arch in x86_64 aarch64; do
     deb_arch=${ARCHES[$arch]}
     stanza=$(curl -fsSL "$BASE/dists/stable/main/binary-$deb_arch/Packages" | parse_index)
@@ -70,11 +60,9 @@ import re, sys
 manifest, deb_arch, url, sha, size = sys.argv[1:6]
 text = open(manifest).read()
 
-# Anchor on the one url line for this arch that is directly followed by
-# sha256 and size, i.e. the extra-data source itself. The x-checker-data
-# block has no such pair, so it can never match. [ \t] rather than \s for
-# the indent: \s also eats the preceding newline, which turns the rewrite
-# into url/sha256/size separated by blank lines.
+# Match the url line directly followed by sha256 and size, so an url inside
+# x-checker-data can never match. [ \t] not \s for the indent: \s also eats
+# the preceding newline and leaves blank lines between the rewritten fields.
 pattern = re.compile(
     r'^([ \t]*)url:\s*\S*_' + re.escape(deb_arch) + r'\.deb\n'
     r'[ \t]*sha256:\s*\S+\n'

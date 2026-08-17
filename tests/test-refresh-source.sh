@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
-# Tests for scripts/refresh-source.sh, which rewrites the file that decides
-# what bytes every user installs. It runs unattended with auto-merge armed, so
-# a silent mis-rewrite ships to real machines with no human reading the diff.
-#
-# The upstream APT index is stubbed with file:// URLs via DEB_REPO_BASE.
+# Tests for scripts/refresh-source.sh. The upstream APT index is stubbed with
+# file:// URLs via DEB_REPO_BASE.
 #
 # Usage: tests/test-refresh-source.sh
 set -euo pipefail
@@ -119,10 +116,8 @@ check "x-checker-data url left untouched" "$manifest" \
 check "metainfo release updated" "$(cat "$work/build-aux/test.metainfo.xml")" \
       '<release version="27.100.11111"'
 
-# The three fields must stay adjacent lines. A regex that eats the preceding
-# newline into its indent group reproduces url/sha256/size separated by blank
-# lines, which line-by-line greps cannot see and idempotence cannot catch,
-# because the second run regenerates the same layout.
+# url/sha256/size must stay adjacent: a regex that eats the preceding newline
+# leaves blank lines that per-line greps and the idempotence check miss.
 for a in amd64 arm64; do
     block=$(grep -A2 "chatgpt_27.100.11111_$a.deb" "$work/test.ChatGPT.yaml")
     if sed -n 2p <<<"$block" | grep -q '^ *sha256:' \
