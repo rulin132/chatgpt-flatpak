@@ -1,7 +1,11 @@
 name: update-check
 
-# Upstream publishes to a rolling "latest" URL, so the bytes behind our pinned
-# sha256 rotate without warning and every new install then fails on checksum.
+# Watch upstream's APT index and re-pin when a new version appears. The
+# manifest pins versioned pool/ URLs, so an upstream release does not corrupt
+# existing pins; it eventually deletes the old .deb from pool/, at which point
+# installs 404 until the re-pin this job opens has landed. The job is the
+# difference between that window being hours and being however long it takes
+# someone to notice.
 #
 # First-party on purpose. The previous version used three marketplace actions
 # and never ran: its only execution failed at "Set up job" with "Repository
@@ -73,7 +77,7 @@ jobs:
           fi
           gh pr create --head chore/upstream-refresh --base main \
             --title "Re-pin upstream $ver" --label automated \
-            --body "Upstream rotated the bytes behind the rolling latest URL. sha256 and size are re-pinned for both architectures and the AppStream release entry updated from the .deb control file.
+            --body "Upstream published $ver to their APT repository. The manifest now pins its versioned pool/ URLs, sha256 and size for both architectures, straight from the Packages index, and the AppStream release entry is updated to match.
 
           Merging is not a rubber stamp. CI installs this payload for real on x86_64 and aarch64 and asserts it launches. If upstream moved app.asar or renamed the binary, those jobs fail and scripts/inspect-deb.sh says what changed."
 

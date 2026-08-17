@@ -25,6 +25,3 @@ deb_control() {
     deb_cat "$1" "$(deb_member "$1" control.tar)" | tar xO ./control
 }
 
-deb_version() {
-    deb_control "$1" | sed -n 's/^Version:[[:space:]]*//p'
-}

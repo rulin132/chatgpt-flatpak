@@ -130,19 +130,15 @@ None of this is optional, and nothing here is created for you.
 ### The nightly refresh
 
 `update-check.yml` runs `scripts/refresh-source.sh` at 04:17 UTC. Upstream
-publishes to a rolling `latest` URL, so the bytes behind our pinned sha256
-rotate with no version change. The job re-pins sha256 and size for both
-architectures, bumps the AppStream release entry from the `.deb` control file,
-and opens a PR on `chore/upstream-refresh` labelled `automated`. If the
-repository has been quiet for 50 days it also commits to `chore/keepalive`,
-because GitHub disables scheduled workflows after 60 days of inactivity.
-
-This is more work than it needs to be, and the rotation it chases is
-self-inflicted. Upstream also publishes a real APT repository, with versioned
-paths under `pool/` and a `Packages` index carrying `Version`, `Size` and
-`SHA256` for each architecture. Pinning the versioned URL means the bytes behind
-a hash cannot change, and the index supplies the hashes without downloading
-750 MB of `.deb` to compute them. Moving to it is the next change here.
+publishes a real APT repository, so the script reads `Version`, `Filename`,
+`Size` and `SHA256` for both architectures from the `Packages` indexes, a few
+kilobytes, rewrites the manifest's versioned `pool/` pins, bumps the AppStream
+release entry, and opens a PR on `chore/upstream-refresh` labelled `automated`.
+Versioned pins cannot rot silently: when upstream deletes an old `.deb` from
+`pool/`, installs fail cleanly on 404 until the refresh PR lands. If the
+repository has been quiet for 50 days the job also commits to
+`chore/keepalive`, because GitHub disables scheduled workflows after 60 days
+of inactivity.
 
 ## Known issues
 
