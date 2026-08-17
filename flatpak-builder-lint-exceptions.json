@@ -1,5 +1,6 @@
 {
   "io.github.rulin132.ChatGPT": {
-    "appid-url-not-reachable": "The linter expects github.com/rulin132/chatgpt to exist for this app id, but the repo is named chatgpt-flatpak. Permanent unless a stub repo is created at that name."
+    "appid-url-not-reachable": "The linter expects github.com/rulin132/chatgpt to exist for this app id, but the repo is named chatgpt-flatpak. Permanent unless a stub repo is created at that name.",
+    "finish-args-own-name-org.freedesktop.StatusNotifierItem-2-1": "Chromium registers its tray item under this exact name (sandbox pid is always 2). Without owning it the DBus proxy rejects the registration and the tray icon never appears."
   }
 }

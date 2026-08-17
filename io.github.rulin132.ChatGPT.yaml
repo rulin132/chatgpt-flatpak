@@ -34,6 +34,9 @@ finish-args:
   - --talk-name=org.kde.kwalletd6
   # Tray icon (StatusNotifierItem only; GNOME additionally needs a shell ext).
   - --talk-name=org.kde.StatusNotifierWatcher
+  # Chromium owns this exact name for its tray item (sandbox pid is always 2).
+  # Without it the proxy denies RequestName and the icon silently never shows.
+  - --own-name=org.freedesktop.StatusNotifierItem-2-1
   # Notifications go through the portal, no talk-name needed since BaseApp 23.08.
   #
   # The app hardcodes ~/.codex and ~/.cache, ignoring XDG_CACHE_HOME, and
