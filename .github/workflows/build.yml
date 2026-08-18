@@ -21,7 +21,7 @@ jobs:
   shellcheck:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       # Print the version: the runner's is older than a typical local one and
       # still flags SC2015, so green locally and red here look identical.
       - run: shellcheck --version && shellcheck -x scripts/*.sh tests/*.sh build-aux/apply_extra build-aux/launcher.sh
@@ -35,7 +35,7 @@ jobs:
       image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
       options: --privileged
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       # The bare binary, NOT `flatpak run org.flatpak.Builder`: that form cannot
       # create .flatpak-builder in the runner workspace from inside the sandbox
       # and dies on Permission denied. `make lint` uses the flatpak form because
@@ -64,7 +64,7 @@ jobs:
       image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
       options: --privileged
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # A repo, not a bundle: build-bundle cannot carry extra-data
       # (flatpak#1334), so its .flatpak has no payload. Extra-data is fetched at

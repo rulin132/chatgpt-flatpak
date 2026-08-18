@@ -41,7 +41,7 @@ jobs:
       image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
       options: --privileged
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Unsigned here. Signing happens once, in publish, so the key touches one
       # job rather than every matrix leg.
@@ -86,7 +86,7 @@ jobs:
       image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
       options: --privileged
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: actions/download-artifact@v4
         with:
@@ -253,7 +253,7 @@ jobs:
     steps:
       # ci-smoke.sh reads build-aux/*.metainfo.xml to check the installed
       # payload against the version this release claims, so it needs the tree.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: install from the published remote
         env:
