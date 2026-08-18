@@ -140,6 +140,17 @@ repository has been quiet for 50 days the job also commits to
 `chore/keepalive`, because GitHub disables scheduled workflows after 60 days
 of inactivity.
 
+## Autostart
+
+To start it at login:
+
+```sh
+cp ~/.local/share/flatpak/exports/share/applications/io.github.rulin132.ChatGPT.desktop ~/.config/autostart/
+```
+
+It opens with its window. Starting minimized to the tray would need a flag from
+the app itself, which upstream has not added.
+
 ## Known issues
 
 If something misbehaves, capture the log first:
