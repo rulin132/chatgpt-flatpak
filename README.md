@@ -159,25 +159,37 @@ If something misbehaves, capture the log first:
 flatpak run io.github.rulin132.ChatGPT 2>&1 | tee /tmp/chatgpt.log
 ```
 
-**The avatar overlay renders as an opaque box on Wayland.** Upstream draws the
-"pet" in a second, frameless, transparent window, and this Electron build does
-not composite window transparency on the Wayland Ozone backend. Measured against
-26.810.52044: broken on Wayland, broken on Wayland with Vulkan disabled, correct
-on XWayland. It is an upstream platform bug, not something this packaging causes.
+**The avatar overlay renders as an opaque box.** The pet lives in frameless
+transparent windows, and those go opaque when Chromium inside the sandbox loses
+hardware GL and degrades to software rendering. The usual cause on NVIDIA: the
+host driver updated before the matching `org.freedesktop.Platform.GL.nvidia`
+extension, and flatpak mounts that extension only on an exact version match, so
+the sandbox is left with no usable driver. This is not a Wayland limitation and
+not an upstream Electron bug: with a healthy GL stack, native Wayland
+composites the pet correctly (re-verified against 26.810.52044 on GNOME with
+NVIDIA, in hardware, SwiftShader, and no-GL modes). Earlier revisions of this
+document called it an upstream platform bug and said to accept it; that
+measurement was taken during exactly such a mismatch window and did not survive
+re-testing on a healthy stack.
 
-**Accept it.** XWayland renders the pet correctly, and earlier versions of this
-document suggested reaching for it. That was bad advice: it costs you native
-Wayland scaling and input handling, and X11 is a shared server, so the app can
-watch other X11 clients' input and windows. Trading that away for a decorative
-overlay is a poor bargain in a package whose entire purpose is confinement. If
-you want the pet, install it on the host with the cask; if you want the sandbox,
-the pet does not draw.
+**Diagnosis and fix.** The launcher warns on stderr when it sees an NVIDIA
+device with no `GL/nvidia-*` extension mounted. To check by hand, compare
+`flatpak list --runtime | grep GL.nvidia` against the host driver version from
+`nvidia-smi`. Then `flatpak update` and restart the app. On a hybrid
+NVIDIA-plus-integrated laptop that renders on the iGPU via Mesa, the warning
+can fire while everything looks correct; if the pet is drawing fine, ignore it.
 
-**Do not "fix" this by adding `--socket=x11` to the manifest.** The launcher
-passes `--ozone-platform-hint=auto`, and this Electron prefers X11 whenever
-`DISPLAY` is set. Granting the socket therefore moves *every* user to XWayland
-rather than offering a fallback. If that ever becomes desirable, the hint has to
-be pinned to `wayland` in the same change.
+**Prevention.** On image-based hosts the driver lands at reboot but the GL
+extension lands on `flatpak update`, so the mismatch window is an update-order
+problem. Keep flatpak auto-updates on (GNOME Software, or a daily
+`flatpak update -y` timer) and the window stays effectively closed.
+
+**Do not add `--socket=x11` to the manifest chasing rendering bugs.** The
+launcher passes `--ozone-platform-hint=auto`, and this Electron prefers X11
+whenever `DISPLAY` is set. Granting the socket therefore moves *every* user to
+XWayland rather than offering a fallback, and X11 is a shared server, so the
+app could watch other X11 clients' input and windows. If it ever becomes
+desirable, the hint has to be pinned to `wayland` in the same change.
 
 **A blank window is not fixed with `--disable-gpu`.** That leaves Chromium with
 no rasteriser and opens no window at all. Use `CHATGPT_DISABLE_GPU=1`, which
