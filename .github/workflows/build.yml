@@ -6,6 +6,12 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Least privilege: every job here only reads the checkout (shellcheck, lint,
+# build, smoke test). None push, comment, or release, so the token needs no
+# write scope.
+permissions:
+  contents: read
+
 concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: true
