@@ -16,7 +16,7 @@ CURRENT_USER := $(word 3,$(subst ., ,$(APP_ID)))
 # The distros this exists for cannot layer flatpak-builder.
 FB := $(shell command -v flatpak-builder 2>/dev/null || echo 'flatpak run org.flatpak.Builder')
 
-.PHONY: help rename deps hashes icons inspect lint build install run bundle repo oci clean distclean
+.PHONY: help rename deps hashes icons inspect lint build install run bundle repo clean distclean
 
 help:
 	@echo "make rename GH_USER=<you>   set the app-id namespace across the repo (do this first)"
@@ -29,7 +29,6 @@ help:
 	@echo "make install                build + install --user"
 	@echo "make run                    run the installed app"
 	@echo "make repo GPG_KEY=<id>      sign + generate static deltas + prune"
-	@echo "make oci                    OCI image for a container registry"
 
 rename:
 	@test -n "$(GH_USER)" || { echo "usage: make rename GH_USER=<your-github-username>"; exit 1; }
@@ -39,16 +38,15 @@ rename:
 	  echo "already io.github.$(CURRENT_USER).ChatGPT, nothing to do"; \
 	else \
 	  for f in $$(grep -rl '$(CURRENT_USER)' --exclude-dir=.git --exclude-dir=build \
-	      --exclude-dir=repo --exclude-dir=.cache --exclude-dir=oci \
+	      --exclude-dir=repo --exclude-dir=.cache \
 	      --exclude-dir=.flatpak-builder .); do \
 	    sed -i "s/io\.github\.$(CURRENT_USER)/io.github.$(GH_USER)/g; \
 	            s|github\.com/$(CURRENT_USER)|github.com/$(GH_USER)|g; \
-	            s|$(CURRENT_USER)\.github\.io|$(GH_USER).github.io|g; \
-	            s|ghcr\.io/$(CURRENT_USER)|ghcr.io/$(GH_USER)|g" "$$f"; \
+	            s|$(CURRENT_USER)\.github\.io|$(GH_USER).github.io|g" "$$f"; \
 	  done; \
 	  for f in $$(find . -name '*$(CURRENT_USER)*' -not -path './.git/*' \
 	      -not -path './build/*' -not -path './repo/*' -not -path './.cache/*' \
-	      -not -path './oci/*' -not -path './.flatpak-builder/*'); do \
+	      -not -path './.flatpak-builder/*'); do \
 	    n=$$(echo "$$f" | sed 's/$(CURRENT_USER)/$(GH_USER)/'); \
 	    git mv "$$f" "$$n" 2>/dev/null || mv "$$f" "$$n"; \
 	  done; \
@@ -103,11 +101,8 @@ bundle:
 repo: build
 	flatpak build-update-repo $(GPG_ARGS) --generate-static-deltas --prune $(REPO)
 
-oci: build
-	flatpak build-bundle --oci --oci-layer-compress=zstd $(REPO) oci/$(APP_ID) $(APP_ID)
-
 clean:
 	rm -rf $(BUILDDIR) .flatpak-builder
 
 distclean: clean
-	rm -rf $(REPO) oci *.flatpak
+	rm -rf $(REPO) *.flatpak

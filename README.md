@@ -34,19 +34,6 @@ for example your Desktop:
 flatpak override --user --filesystem=~/Desktop io.github.rulin132.ChatGPT
 ```
 
-Also published as an OCI image at `ghcr.io/rulin132/chatgpt-flatpak`, for
-mirroring and offline installs. Fetch it with a registry client first: pointing
-flatpak straight at `docker://` returns 401, because it does not complete the
-anonymous token exchange GHCR requires, even though the package is public.
-
-```sh
-skopeo copy docker://ghcr.io/rulin132/chatgpt-flatpak:latest oci:oci-chatgpt:latest
-flatpak install --user --image oci:oci-chatgpt:latest
-```
-
-That image is 3 MB. It carries the packaging alone; the application itself is
-still downloaded from OpenAI at install time, exactly as with the repo above.
-
 ## Sandbox
 
 Sealed by default: no `--filesystem=host`, no
@@ -110,9 +97,6 @@ None of this is optional, and nothing here is created for you.
 **Settings**
 
 - Pages, source: GitHub Actions.
-- Make the GHCR package public. A package created by the first push defaults to
-  private, so the `docker://ghcr.io/...` install above returns 401 for everyone
-  until you change it under Packages, package settings, change visibility.
 - Allow auto-merge, under General. Without it the auto-merge step errors out.
 - Branch protection on `main` requiring these four checks: `shellcheck`,
   `lint`, `build (x86_64, ubuntu-latest)`, `build (aarch64, ubuntu-24.04-arm)`.
