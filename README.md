@@ -164,13 +164,19 @@ transparent windows, and those go opaque when Chromium inside the sandbox loses
 hardware GL and degrades to software rendering. The usual cause on NVIDIA: the
 host driver updated before the matching `org.freedesktop.Platform.GL.nvidia`
 extension, and flatpak mounts that extension only on an exact version match, so
-the sandbox is left with no usable driver. This is not a Wayland limitation and
-not an upstream Electron bug: with a healthy GL stack, native Wayland
-composites the pet correctly (re-verified against 26.810.52044 on GNOME with
-NVIDIA, in hardware, SwiftShader, and no-GL modes). Earlier revisions of this
-document called it an upstream platform bug and said to accept it; that
-measurement was taken during exactly such a mismatch window and did not survive
-re-testing on a healthy stack.
+the sandbox is left with no usable driver. With a healthy GL stack this
+composited correctly (verified against 26.810.52044 on GNOME with NVIDIA, in
+hardware, SwiftShader, and no-GL modes), so earlier revisions of this document
+blamed the mismatch alone.
+
+A matched stack is not a guarantee. The box also reproduces with the driver
+and GL extension in sync (observed on NVIDIA 610.43.03 against both
+26.810.52044 and 26.814.41957, with the rest of the app rendering in
+hardware). The same machine composited the pet correctly under the previous
+driver series, so this second cause lives in the driver or compositor, not in
+the app or this packaging. Chromium logging one "'--ozone-platform=wayland'
+is not compatible with Vulkan" error at startup is the fingerprint seen
+alongside it.
 
 **Diagnosis and fix.** The launcher warns on stderr when it sees an NVIDIA
 device with no `GL/nvidia-*` extension mounted. To check by hand, compare
@@ -178,6 +184,9 @@ device with no `GL/nvidia-*` extension mounted. To check by hand, compare
 `nvidia-smi`. Then `flatpak update` and restart the app. On a hybrid
 NVIDIA-plus-integrated laptop that renders on the iGPU via Mesa, the warning
 can fire while everything looks correct; if the pet is drawing fine, ignore it.
+If the warning stays quiet, the versions match, and the box persists, you are
+in the second case: accept it and wait for a driver update. Do not reach for
+X11 (below).
 
 **Prevention.** On image-based hosts the driver lands at reboot but the GL
 extension lands on `flatpak update`, so the mismatch window is an update-order
