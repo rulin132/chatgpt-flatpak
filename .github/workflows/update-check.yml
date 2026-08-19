@@ -112,11 +112,17 @@ jobs:
           # Author and label as well as the branch name. On the branch alone,
           # anyone who can open a PR from a branch called chore/upstream-refresh
           # gets it auto-merged the moment checks pass, which walks straight
-          # past the human merge gate. @me is the automation token's own user,
-          # so this only ever matches a PR this workflow opened.
-          num=$(gh pr list --head chore/upstream-refresh --state open \
-            --author "@me" --label automated \
-            --json number --jq '.[0].number // empty')
-          [ -n "$num" ] || { echo "no open refresh PR"; exit 0; }
+          # past the human merge gate. The login comes from the API, not @me:
+          # gh resolves @me through the search index, which lags PR creation by
+          # a few seconds, so the just-opened PR was invisible and auto-merge
+          # silently never armed. pr view resolves the branch directly.
+          me=$(gh api user --jq .login)
+          read -r num author labels < <(gh pr view chore/upstream-refresh \
+            --json number,author,labels,state \
+            --jq 'select(.state == "OPEN") | "\(.number) \(.author.login) \([.labels[].name] | join(","))"' \
+            || true) || true
+          [ -n "${num:-}" ] || { echo "no open refresh PR"; exit 0; }
+          [ "$author" = "$me" ] || { echo "PR #$num not opened by $me, refusing"; exit 0; }
+          case ",$labels," in *,automated,*) ;; *) echo "PR #$num missing automated label, refusing"; exit 0;; esac
           gh pr merge "$num" --auto --squash
           echo "auto-merge armed on PR #$num; it lands when the required checks pass"
