@@ -86,9 +86,9 @@ modules:
         filename: chatgpt.deb
         only-arches:
           - x86_64
-        url: https://persistent.oaistatic.com/codex-app-prod/linux/deb/pool/main/c/chatgpt/chatgpt_26.814.41957_amd64.deb
-        sha256: 4778b26a7abd08647214d5b05c17bd3ebe2d9688d146dabf017c1a2faf93ac7d
-        size: 385510290
+        url: https://persistent.oaistatic.com/codex-app-prod/linux/deb/pool/main/c/chatgpt/chatgpt_26.818.21641_amd64.deb
+        sha256: e138b8e8008f2b90071e1b19f9cef1125c5ed7710e68fd9c87e6655285d68f6a
+        size: 387562394
         x-checker-data:
           type: debian-repo
           package-name: chatgpt
@@ -101,9 +101,9 @@ modules:
         filename: chatgpt.deb
         only-arches:
           - aarch64
-        url: https://persistent.oaistatic.com/codex-app-prod/linux/deb/pool/main/c/chatgpt/chatgpt_26.814.41957_arm64.deb
-        sha256: 8c40b31419dd4f4a8eb292d40dc3f8a418807dfe8c0101ae7164fa4ee415f818
-        size: 363346714
+        url: https://persistent.oaistatic.com/codex-app-prod/linux/deb/pool/main/c/chatgpt/chatgpt_26.818.21641_arm64.deb
+        sha256: cc9eb5823f188e6e769ca5b7f79ef98cb26286e190037e030f48e9145d9c1d45
+        size: 365144298
         x-checker-data:
           type: debian-repo
           package-name: chatgpt
