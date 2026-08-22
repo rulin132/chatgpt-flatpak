@@ -38,10 +38,10 @@ jobs:
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
     container:
-      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08@sha256:6f3180c6765cb55e5dcd8ee4127b82aba25163c8c655a161422b7c447c14e4af
       options: --privileged
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       # Unsigned here. Signing happens once, in publish, so the key touches one
       # job rather than every matrix leg.
@@ -71,7 +71,7 @@ jobs:
       - name: pack the repo
         run: tar -cf repo.tar repo
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: repo-${{ matrix.arch }}
           path: repo.tar
@@ -83,12 +83,12 @@ jobs:
     outputs:
       version: ${{ steps.ver.outputs.v }}
     container:
-      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08@sha256:6f3180c6765cb55e5dcd8ee4127b82aba25163c8c655a161422b7c447c14e4af
       options: --privileged
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: arch-repos
 
@@ -162,7 +162,15 @@ jobs:
           BUILD_ID: ${{ github.run_id }}-${{ github.run_attempt }}
         run: ./scripts/publish-pages.sh
 
-      - uses: actions/upload-pages-artifact@v3
+      # The public key has already been exported into the Pages metadata. Drop
+      # the private key before any later third-party action executes.
+      - name: remove signing key
+        if: always()
+        run: |
+          if [ -n "${GNUPGHOME:-}" ]; then
+            rm -rf -- "$GNUPGHOME"
+          fi
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:
           path: public
 
@@ -177,7 +185,7 @@ jobs:
           flatpak build-bundle --oci --oci-layer-compress=zstd \
             repo oci-image io.github.rulin132.ChatGPT
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: oci-image
           path: oci-image
@@ -190,7 +198,7 @@ jobs:
       #
       # No files: attached, per the bundle note above. The release is a marker
       # pointing at the repo remote.
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           tag_name: v${{ steps.ver.outputs.v }}
           body: |
@@ -209,7 +217,7 @@ jobs:
     permissions:
       packages: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: oci-image
           path: oci-image
@@ -236,7 +244,7 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - id: deploy
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
 
   # The only job that tests what a user actually does. Every other install in
   # this pipeline reads a local repo directory with --no-gpg-verify, which is
@@ -253,7 +261,7 @@ jobs:
     steps:
       # ci-smoke.sh reads build-aux/*.metainfo.xml to check the installed
       # payload against the version this release claims, so it needs the tree.
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: install from the published remote
         env:
