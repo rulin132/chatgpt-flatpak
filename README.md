@@ -169,14 +169,13 @@ composited correctly (verified against 26.810.52044 on GNOME with NVIDIA, in
 hardware, SwiftShader, and no-GL modes), so earlier revisions of this document
 blamed the mismatch alone.
 
-A matched stack is not a guarantee. The box also reproduces with the driver
-and GL extension in sync (observed on NVIDIA 610.43.03 against both
-26.810.52044 and 26.814.41957, with the rest of the app rendering in
-hardware). The same machine composited the pet correctly under the previous
-driver series, so this second cause lives in the driver or compositor, not in
-the app or this packaging. Chromium logging one "'--ozone-platform=wayland'
-is not compatible with Vulkan" error at startup is the fingerprint seen
-alongside it.
+A matched stack is not a guarantee. The box also reproduced with the driver
+and GL extension in sync (NVIDIA 610.43.03 against both 26.810.52044 and
+26.814.41957, with the rest of the app rendering in hardware), alongside a
+"'--ozone-platform=wayland' is not compatible with Vulkan" error at startup.
+Upstream fixed that case in 26.818 on the same driver, so it was the app's
+Vulkan use on Wayland, and it can regress the same way again. If the box is
+back on a matched stack, suspect the app version first.
 
 **Diagnosis and fix.** The launcher warns on stderr when it sees an NVIDIA
 device with no `GL/nvidia-*` extension mounted. To check by hand, compare
@@ -185,8 +184,8 @@ device with no `GL/nvidia-*` extension mounted. To check by hand, compare
 NVIDIA-plus-integrated laptop that renders on the iGPU via Mesa, the warning
 can fire while everything looks correct; if the pet is drawing fine, ignore it.
 If the warning stays quiet, the versions match, and the box persists, you are
-in the second case: accept it and wait for a driver update. Do not reach for
-X11 (below).
+in the second case: it heals with an app update, not anything local. Do not
+reach for X11 (below).
 
 **Prevention.** On image-based hosts the driver lands at reboot but the GL
 extension lands on `flatpak update`, so the mismatch window is an update-order
