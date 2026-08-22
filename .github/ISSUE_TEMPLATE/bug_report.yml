@@ -1,0 +1,101 @@
+name: Packaging bug
+description: Report an installation, sandbox, launcher, update, or Flatpak-specific problem
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This repository packages the official ChatGPT / Codex Linux application. Please report a problem here only when it is specific to this Flatpak or its packaging. Never include tokens, account data, private file paths, or other sensitive information.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and did not find a duplicate.
+          required: true
+        - label: I updated the Flatpak and reproduced the problem on the latest available version.
+          required: true
+        - label: I removed secrets, personal data, and sensitive paths from the information below.
+          required: true
+        - label: This is not a vulnerability. I will report security issues according to the security policy instead.
+          required: true
+
+  - type: dropdown
+    id: upstream
+    attributes:
+      label: Official package comparison
+      description: Does the same problem occur with OpenAI's official Linux package outside Flatpak?
+      options:
+        - No; it appears specific to this Flatpak
+        - Yes; it also occurs in the official package
+        - I could not test the official package
+        - Not applicable (for example, an install or repository problem)
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Problem summary
+      description: Describe what is broken and the impact it has.
+      placeholder: The app installs, but no window appears after launch.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Provide the smallest exact sequence of commands and actions that reproduces the problem.
+      placeholder: |
+        1. Run `flatpak update`.
+        2. Run `flatpak run io.github.rulin132.ChatGPT`.
+        3. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include distribution, desktop/session type, CPU architecture, GPU, and the output of `flatpak --version` and `flatpak info io.github.rulin132.ChatGPT`.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: overrides
+    attributes:
+      label: Flatpak overrides
+      description: Paste the output of `flatpak override --user --show io.github.rulin132.ChatGPT`. Write "none" if empty.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Paste the relevant portion of `flatpak run io.github.rulin132.ChatGPT 2>&1`. Redact sensitive information first.
+      render: text
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Add screenshots, regression information, workarounds, or anything else that may help.

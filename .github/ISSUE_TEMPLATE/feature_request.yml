@@ -1,0 +1,67 @@
+name: Packaging enhancement
+description: Suggest an improvement to the Flatpak packaging or its maintenance
+title: "[Enhancement]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Requests must be within this repository's scope: the Flatpak manifest, sandbox integration, launcher, publishing, automation, or documentation. Product features for ChatGPT or Codex belong with OpenAI.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and did not find a duplicate.
+          required: true
+        - label: This request concerns the Flatpak packaging, not a feature of the upstream application.
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or limitation
+      description: What packaging or maintenance problem would this change solve, and who encounters it?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: Describe the behaviour you would like and, if possible, how it could be implemented.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Describe workarounds or other approaches you considered.
+
+  - type: textarea
+    id: security
+    attributes:
+      label: Sandbox and security impact
+      description: Does this need new filesystem, device, socket, network, or D-Bus access? Explain why the benefit justifies any broader permission.
+      placeholder: No new permissions are required because ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: contribution
+    attributes:
+      label: Contribution
+      description: Would you be willing to work on this change?
+      options:
+        - Yes, I can open a pull request
+        - Maybe, with guidance
+        - No
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Add examples, links, mock-ups, or other useful context.

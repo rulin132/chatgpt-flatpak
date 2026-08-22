@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security report
+    url: https://github.com/rulin132/chatgpt-flatpak/blob/main/docs/SECURITY.md
+    about: Read the security policy before reporting a vulnerability or sensitive issue.
+  - name: Upstream ChatGPT or Codex support
+    url: https://help.openai.com/
+    about: Use OpenAI Support when the problem also occurs in the official application.
