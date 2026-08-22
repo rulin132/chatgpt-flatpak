@@ -78,30 +78,6 @@ from command sandboxing. If it remains after this Codex wrapper fix, it points
 to an app/plugin version or feature-integration mismatch, not a missing Flatpak
 permission. Do not widen filesystem or D-Bus access to work around it.
 
-The connector failure has also been reproduced directly on chatgpt.com, outside
-the Flatpak. In **Settings → Plugins → Codex Security**, the web UI shows a
-**Connect** action for "Codex Security Access", while the browser's network
-request contains:
-
-```text
-connector_id: connector_openai_codex_security_access
-name: Codex Security Access
-action_names: []
-```
-
-The web request receives `{"detail":"Connector not found"}`. The web UI is
-therefore advertising a connector with no actions that the backend cannot
-resolve. A second chatgpt.com capture shows the **Connect Codex Security
-Access** modal reporting **Failed to add connector link**; its `noauth` network
-request returns HTTP 404 in about 216 ms while an adjacent request returns 200.
-Because these requests originate and fail in the web application, this is
-definitively independent of Flatpak packaging, permissions, networking, and the
-Codex `bwrap` command runner. Likely causes are the ChatGPT web/backend
-connector catalog, account entitlement or workspace policy, a stale plugin
-manifest, or a feature rollout mismatch. Filesystem grants, D-Bus grants, and
-host execution access cannot repair it. The local wrapper in this package
-remains scoped only to making Codex command execution work inside Flatpak.
-
 ## What this package does not do
 
 **No network egress filtering.** `--share=network` is all-or-nothing; flatpak
