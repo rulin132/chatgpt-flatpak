@@ -174,15 +174,7 @@ a scan with **Security → Scans → + Scan**, which lets the workbench register
 `CODEX_SECURITY_SCAN_ID`. If the app reports that
 `start_codex_security_prompt_only_scan` is unavailable, update or reconcile the
 app/plugin integration; it is not fixed by granting broader Flatpak filesystem
-or D-Bus permissions. The same connector failure occurs directly in
-chatgpt.com: **Settings → Plugins → Codex Security** shows a Connect action, but
-its browser request sends `action_names: []` and receives
-`{"detail":"Connector not found"}`. That proves the failure is independent of
-this package and its `bwrap` fix. A second web capture shows **Failed to add
-connector link** with the connector's `noauth` request returning HTTP 404 while
-an adjacent request succeeds. It instead points to the ChatGPT connector
-catalog, entitlement or workspace policy, a stale plugin manifest, or rollout
-state. The wrapper here changes Codex command execution only.
+or D-Bus permissions.
 
 **The pet renders as an opaque box.** In order of likelihood:
 
