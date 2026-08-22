@@ -157,6 +157,30 @@ check "metainfo untouched on disagreement" \
       "$(cat "$work/build-aux/test.metainfo.xml")" 'version="0.0.0"'
 rm -rf "$work"
 
+# --- invalid second stanza: preflight both, write nothing ---------------------
+work=$(make_work 27.100.11111 27.100.11111)
+arm_packages=$work/repo/dists/stable/main/binary-arm64/Packages
+sed -i 's/^SHA256: b\{64\}$/SHA256: not-a-checksum/' "$arm_packages"
+before_manifest=$(cat "$work/test.ChatGPT.yaml")
+before_metainfo=$(cat "$work/build-aux/test.metainfo.xml")
+if out=$( cd "$work" && DEB_REPO_BASE="file://$work/repo" "$SCRIPT" test.ChatGPT.yaml 2>&1 ); then
+    bad "invalid arm64 checksum must exit non-zero"
+else
+    ok "invalid arm64 checksum exits non-zero"
+fi
+check "and reports invalid arm64 SHA256" "$out" "invalid SHA256 in arm64"
+if [ "$before_manifest" = "$(cat "$work/test.ChatGPT.yaml")" ]; then
+    ok "manifest untouched when second stanza is invalid"
+else
+    bad "manifest untouched when second stanza is invalid"
+fi
+if [ "$before_metainfo" = "$(cat "$work/build-aux/test.metainfo.xml")" ]; then
+    ok "metainfo untouched when second stanza is invalid"
+else
+    bad "metainfo untouched when second stanza is invalid"
+fi
+rm -rf "$work"
+
 # The APT index is untrusted input. Reject a version containing shell syntax
 # before either the manifest or metainfo is changed.
 # The literal command substitution below is the test input.

@@ -56,6 +56,10 @@ validate_stanza() {
 
 declare -A ARCHES=([x86_64]=amd64 [aarch64]=arm64)
 declare -A STANZAS=()
+declare -A VERSIONS=()
+declare -A FILENAMES=()
+declare -A SIZES=()
+declare -A SHA256S=()
 
 # Read both indexes before writing anything: the arches publish separately and
 # can briefly disagree, and a mixed pin must never reach the manifest.
@@ -68,9 +72,21 @@ for arch in x86_64 aarch64; do
     }
     STANZAS[$arch]=$stanza
 done
+# Validate and parse every stanza before changing either repository file. A
+# bad second architecture must not leave the first source block half-updated.
+for arch in x86_64 aarch64; do
+    deb_arch=${ARCHES[$arch]}
+    read -r ver filename size sha256 extra <<<"${STANZAS[$arch]}"
+    validate_stanza "$deb_arch" "$ver" "$filename" "$size" "$sha256" "$extra"
+    VERSIONS[$arch]=$ver
+    FILENAMES[$arch]=$filename
+    SIZES[$arch]=$size
+    SHA256S[$arch]=$sha256
+done
 
-ver_x86=${STANZAS[x86_64]%% *}
-ver_arm=${STANZAS[aarch64]%% *}
+
+ver_x86=${VERSIONS[x86_64]}
+ver_arm=${VERSIONS[aarch64]}
 if [ "$ver_x86" != "$ver_arm" ]; then
     echo "refresh-source: indexes disagree: x86_64=$ver_x86 aarch64=$ver_arm" >&2
     echo "refresh-source: upstream is likely mid-publish, retry later" >&2
@@ -79,8 +95,10 @@ fi
 
 for arch in x86_64 aarch64; do
     deb_arch=${ARCHES[$arch]}
-    read -r ver filename size sha256 extra <<<"${STANZAS[$arch]}"
-    validate_stanza "$deb_arch" "$ver" "$filename" "$size" "$sha256" "$extra"
+    ver=${VERSIONS[$arch]}
+    filename=${FILENAMES[$arch]}
+    size=${SIZES[$arch]}
+    sha256=${SHA256S[$arch]}
     echo ">> $arch: $ver  sha256=$sha256 size=$size"
 
     python3 - "$MANIFEST" "$deb_arch" "$BASE/$filename" "$sha256" "$size" <<'PY'
