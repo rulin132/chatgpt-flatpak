@@ -159,45 +159,19 @@ If something misbehaves, capture the log first:
 flatpak run io.github.rulin132.ChatGPT 2>&1 | tee /tmp/chatgpt.log
 ```
 
-**The avatar overlay renders as an opaque box.** The pet lives in frameless
-transparent windows, and those go opaque when Chromium inside the sandbox loses
-hardware GL and degrades to software rendering. The usual cause on NVIDIA: the
-host driver updated before the matching `org.freedesktop.Platform.GL.nvidia`
-extension, and flatpak mounts that extension only on an exact version match, so
-the sandbox is left with no usable driver. With a healthy GL stack this
-composited correctly (verified against 26.810.52044 on GNOME with NVIDIA, in
-hardware, SwiftShader, and no-GL modes), so earlier revisions of this document
-blamed the mismatch alone.
+**The pet renders as an opaque box.** In order of likelihood:
 
-A matched stack is not a guarantee. The box also reproduced with the driver
-and GL extension in sync (NVIDIA 610.43.03 against both 26.810.52044 and
-26.814.41957, with the rest of the app rendering in hardware), alongside a
-"'--ozone-platform=wayland' is not compatible with Vulkan" error at startup.
-Upstream fixed that case in 26.818 on the same driver, so it was the app's
-Vulkan use on Wayland, and it can regress the same way again. If the box is
-back on a matched stack, suspect the app version first.
-
-**Diagnosis and fix.** The launcher warns on stderr when it sees an NVIDIA
-device with no `GL/nvidia-*` extension mounted. To check by hand, compare
-`flatpak list --runtime | grep GL.nvidia` against the host driver version from
-`nvidia-smi`. Then `flatpak update` and restart the app. On a hybrid
-NVIDIA-plus-integrated laptop that renders on the iGPU via Mesa, the warning
-can fire while everything looks correct; if the pet is drawing fine, ignore it.
-If the warning stays quiet, the versions match, and the box persists, you are
-in the second case: it heals with an app update, not anything local. Do not
-reach for X11 (below).
-
-**Prevention.** On image-based hosts the driver lands at reboot but the GL
-extension lands on `flatpak update`, so the mismatch window is an update-order
-problem. Keep flatpak auto-updates on (GNOME Software, or a daily
-`flatpak update -y` timer) and the window stays effectively closed.
-
-**Do not add `--socket=x11` to the manifest chasing rendering bugs.** The
-launcher passes `--ozone-platform-hint=auto`, and this Electron prefers X11
-whenever `DISPLAY` is set. Granting the socket therefore moves *every* user to
-XWayland rather than offering a fallback, and X11 is a shared server, so the
-app could watch other X11 clients' input and windows. If it ever becomes
-desirable, the hint has to be pinned to `wayland` in the same change.
+1. `flatpak update`, then fully quit and relaunch the app. Old versions had a
+   Wayland rendering bug, fixed upstream in 26.818.
+2. If the launcher warned on stderr about a missing `GL/nvidia-*` extension,
+   your NVIDIA driver updated before the matching flatpak GL extension.
+   `flatpak update` delivers it; keeping flatpak auto-updates on stops this
+   recurring. (On hybrid laptops rendering on the iGPU, the warning can be a
+   false alarm.)
+3. Still broken with everything current: it is an upstream rendering bug, and
+   the fix arrives as an app update. Do not add `--socket=x11` to the manifest
+   to work around it: that moves every user to XWayland, where the app can
+   watch other X11 clients' input and windows.
 
 **A blank window is not fixed with `--disable-gpu`.** That leaves Chromium with
 no rasteriser and opens no window at all. Use `CHATGPT_DISABLE_GPU=1`, which
