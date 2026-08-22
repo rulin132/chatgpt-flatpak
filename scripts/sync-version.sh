@@ -13,6 +13,15 @@ DATE=${2:-$(date -u +%Y-%m-%d)}
 xmls=(build-aux/*.metainfo.xml)
 XML=${xmls[0]}
 
+[[ "$VER" =~ ^[0-9][-0-9A-Za-z.+:~]{0,127}$ ]] || {
+    echo "sync-version: invalid version" >&2
+    exit 1
+}
+[[ "$DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || {
+    echo "sync-version: invalid date" >&2
+    exit 1
+}
+
 python3 - "$XML" "$VER" "$DATE" <<'PY'
 import re, sys
 path, ver, date = sys.argv[1:4]

@@ -105,6 +105,44 @@ else
 fi
 rm -rf "$work"
 
+# Versions originate in upstream APT metadata and later become Actions
+# outputs. Reject shell metacharacters and XML delimiters before writing them.
+# The literal substitutions below are the test inputs.
+# shellcheck disable=SC2016
+for bad_version in '1.2.3$(touch PWNED)' '1.2.3`id`' '1.2.3"/>' '1.2.3 with-space'; do
+    out=$(run_case '    <release version="0.0.0" date="2026-08-14"/>
+' "$bad_version" 2026-08-15)
+    check "rejects unsafe version: $bad_version" "$out" 'EXIT_NONZERO'
+    check_absent "does not write unsafe version: $bad_version" "$out" "$bad_version"
+done
+
+# Debian versions legitimately use epochs and distro revision punctuation.
+out=$(run_case '    <release version="0.0.0" date="2026-08-14"/>
+' '1:2.3.4-5+dist~1' 2026-08-15)
+check "accepts Debian version punctuation" "$out" \
+      '<release version="1:2.3.4-5+dist~1" date="2026-08-15"/>'
+
+# GitHub expressions are substituted before a run block reaches the shell.
+# External values must enter through env and be expanded as quoted variables.
+run_blocks=$(awk '
+    /^[[:space:]]+run:[[:space:]]*(\|[+-]?)?[[:space:]]*$/ {
+        in_run = 1; indent = match($0, /[^ ]/) - 1; next
+    }
+    in_run {
+        current = match($0, /[^ ]/) - 1
+        if (current >= 0 && current <= indent) in_run = 0
+        else print
+    }
+' "$REPO/.github/workflows/release.yml")
+# The literal Actions expressions below are the test inputs.
+# shellcheck disable=SC2016
+for expression in \
+    '${{ github.ref_name }}' '${{ steps.ver.outputs.v }}' \
+    '${{ secrets.GITHUB_TOKEN }}' '${{ github.actor }}' \
+    '${{ needs.publish.outputs.version }}' '${{ github.repository_owner }}'; do
+    check_absent "shell blocks do not interpolate $expression" "$run_blocks" "$expression"
+done
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
