@@ -157,6 +157,26 @@ check "metainfo untouched on disagreement" \
       "$(cat "$work/build-aux/test.metainfo.xml")" 'version="0.0.0"'
 rm -rf "$work"
 
+# The APT index is untrusted input. Reject a version containing shell syntax
+# before either the manifest or metainfo is changed.
+bad_version='27.100.11111$(touch-PWNED)'
+work=$(make_work "$bad_version" "$bad_version")
+before_manifest=$(cat "$work/test.ChatGPT.yaml")
+if out=$( cd "$work" && DEB_REPO_BASE="file://$work/repo" "$SCRIPT" test.ChatGPT.yaml 2>&1 ); then
+    bad "unsafe upstream version must exit non-zero"
+else
+    ok "unsafe upstream version exits non-zero"
+fi
+check "and reports invalid Version" "$out" "invalid Version"
+if [ "$before_manifest" = "$(cat "$work/test.ChatGPT.yaml")" ]; then
+    ok "manifest untouched for unsafe version"
+else
+    bad "manifest untouched for unsafe version"
+fi
+check "metainfo untouched for unsafe version" \
+      "$(cat "$work/build-aux/test.metainfo.xml")" 'version="0.0.0"'
+rm -rf "$work"
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
