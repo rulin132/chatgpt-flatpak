@@ -94,7 +94,12 @@ jobs:
 
       - name: read version
         id: ver
-        run: echo "v=$(sed -n 's/.*<release version="\([^"]*\)".*/\1/p' build-aux/io.github.rulin132.ChatGPT.metainfo.xml | head -n1)" >> "$GITHUB_OUTPUT"
+        run: |
+          set -euo pipefail
+          ver=$(sed -n 's/.*<release version="\([^"]*\)".*/\1/p' build-aux/io.github.rulin132.ChatGPT.metainfo.xml | head -n1)
+          [[ "$ver" =~ ^[0-9][-0-9A-Za-z.+:~]{0,127}$ ]] || {
+            echo "invalid metainfo version" >&2; exit 1; }
+          printf 'v=%s\n' "$ver" >> "$GITHUB_OUTPUT"
 
       # Before anything is signed, uploaded or pushed. The release, the GHCR
       # tags and the Pages site all carry the metainfo version, so a tag that
@@ -102,11 +107,14 @@ jobs:
       # Manual dispatch keeps the derived behaviour and skips this.
       - name: tag must match the manifest version
         if: startsWith(github.ref, 'refs/tags/')
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          RELEASE_VERSION: ${{ steps.ver.outputs.v }}
         run: |
           set -euo pipefail
-          want="v${{ steps.ver.outputs.v }}"
-          test "${{ github.ref_name }}" = "$want" || {
-            echo "tag ${{ github.ref_name }} does not match metainfo $want"; exit 1; }
+          want="v$RELEASE_VERSION"
+          test "$REF_NAME" = "$want" || {
+            echo "tag does not match metainfo $want"; exit 1; }
 
       # GPG signing is not optional: flatpak refuses system-wide installs of
       # extra-data apps from a source that is not gpg-verified.
@@ -223,15 +231,20 @@ jobs:
           path: oci-image
 
       - name: push to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+          RELEASE_VERSION: ${{ needs.publish.outputs.version }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
         run: |
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y skopeo
-          echo "${{ secrets.GITHUB_TOKEN }}" | skopeo login ghcr.io \
-            -u "${{ github.actor }}" --password-stdin
-          for tag in "${{ needs.publish.outputs.version }}" latest; do
+          echo "$GHCR_TOKEN" | skopeo login ghcr.io \
+            -u "$GHCR_USER" --password-stdin
+          for tag in "$RELEASE_VERSION" latest; do
             skopeo copy --format oci oci:oci-image \
-              "docker://ghcr.io/${{ github.repository_owner }}/chatgpt-flatpak:$tag"
+              "docker://ghcr.io/$REPOSITORY_OWNER/chatgpt-flatpak:$tag"
           done
           echo "a newly created GHCR package is private; make it public in the"
           echo "package settings or anonymous pulls get 401"
