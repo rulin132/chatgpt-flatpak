@@ -38,6 +38,7 @@ done < <(grep -HnE 'image:[[:space:]]*[^[:space:]#]+' "$REPO"/.github/workflows/
 # No third-party upload or release action should run while the imported private
 # key remains on disk.
 release=$REPO/.github/workflows/release.yml
+# shellcheck disable=SC2016
 cleanup_line=$(grep -nF 'rm -rf -- "$GNUPGHOME"' "$release" | cut -d: -f1)
 first_upload_line=$(grep -n 'uses: actions/upload-pages-artifact@' "$release" | cut -d: -f1)
 if [ -n "$cleanup_line" ] && [ -n "$first_upload_line" ] \
