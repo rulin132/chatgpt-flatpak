@@ -46,5 +46,15 @@ flatpak run --command=sh "$app_id" -c '
   test -x "$APP_BIN" || { echo "APP_BIN not executable: $APP_BIN"; exit 1; }
   head -c4 "$APP_BIN" | grep -q ELF || { echo "APP_BIN is not an ELF binary"; exit 1; }
   test -f /app/extra/app/resources/app.asar || { echo "no app.asar"; exit 1; }
+  test -x /app/extra/app/resources/codex || { echo "Codex wrapper missing"; exit 1; }
+  grep -Fq "sandbox_mode=\"danger-full-access\"" /app/extra/app/resources/codex || {
+    echo "Codex wrapper does not select danger-full-access"
+    exit 1
+  }
+  test -x /app/extra/app/resources/codex.real || { echo "real Codex binary missing"; exit 1; }
+  head -c4 /app/extra/app/resources/codex.real | grep -q ELF || {
+    echo "real Codex executable is not an ELF binary"
+    exit 1
+  }
   echo "payload OK: $APP_BIN"
 '
