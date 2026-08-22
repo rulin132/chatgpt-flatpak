@@ -18,25 +18,9 @@ die() { echo "apply_extra: $*" >&2; exit 1; }
 [ -f "$DEB" ] || die "$DEB not found in /app/extra"
 
 # --- 1. unpack the .deb ------------------------------------------------------
-if command -v bsdtar >/dev/null 2>&1; then
-    bsdtar -Oxf "$DEB" 'control.tar*' | bsdtar -xf - ./control 2>/dev/null || true
-    bsdtar -Oxf "$DEB" 'data.tar*'    | bsdtar -xf - || die "failed to extract data.tar"
-elif command -v ar >/dev/null 2>&1; then
-    ar x "$DEB" || die "ar failed on $DEB"
-    # data.tar* not data.tar.*: an uncompressed data.tar is legal in a .deb and
-    # the narrower glob missed it, then failed two steps later at "no app.asar
-    # found", which names the wrong cause.
-    for f in control.tar*; do
-        [ -f "$f" ] || continue
-        tar xf "$f" ./control 2>/dev/null || true
-    done
-    for f in data.tar*; do
-        [ -f "$f" ] || continue
-        tar xf "$f" || die "failed to extract $f"
-    done
-else
-    die "neither bsdtar nor ar available in the runtime"
-fi
+command -v bsdtar >/dev/null 2>&1 || die "bsdtar missing from the runtime"
+bsdtar -Oxf "$DEB" 'control.tar*' | bsdtar -xf - ./control 2>/dev/null || true
+bsdtar -Oxf "$DEB" 'data.tar*'    | bsdtar -xf - || die "failed to extract data.tar"
 
 # --- 2. record the upstream version -----------------------------------------
 # Useful for `flatpak run --command=cat ... /app/extra/VERSION` and bug reports.
@@ -45,7 +29,7 @@ if [ -f control ]; then
 fi
 [ -s VERSION ] || echo "unknown" > VERSION
 
-rm -f "$DEB" control control.tar* data.tar* debian-binary _gpgorigin
+rm -f "$DEB" control
 
 # --- 3. locate the payload without hardcoding upstream's layout --------------
 # Upstream may ship under /usr/lib/chatgpt, /opt/chatgpt, /usr/share/..., so do
