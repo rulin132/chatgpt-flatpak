@@ -58,6 +58,16 @@ the other Flatpak repackagings of this app use. `--no-sandbox` does not disable
 "a" sandbox, it removes renderer isolation entirely, so any compromised web
 content inherits every permission the flatpak holds.
 
+Codex command execution uses Flatpak itself as the outer sandbox. Flatpak
+prevents Codex from creating its normal nested `bwrap` user namespace, so this
+package wraps the bundled Codex executable with
+`sandbox_mode="danger-full-access"`. Despite the setting's name, commands do
+not gain host access: they get only what the Flatpak can already see, including
+directories you explicitly grant, app-persistent data, network access, runtime
+tools, and allowed D-Bus services. They cannot read arbitrary host files or run
+host commands. Chromium renderer isolation under zypak is unchanged. See
+[docs/SECURITY.md](docs/SECURITY.md) for the full tradeoff.
+
 Go further and deny X11 outright. `--socket=fallback-x11` only grants X11 when
 there is no Wayland, so on a Wayland session it is already unused; denying it
 means an X11 session, or a change in how the launcher picks its backend, cannot
@@ -158,6 +168,21 @@ If something misbehaves, capture the log first:
 ```sh
 flatpak run io.github.rulin132.ChatGPT 2>&1 | tee /tmp/chatgpt.log
 ```
+
+**Codex Security scan registration is separate from command execution.** Start
+a scan with **Security → Scans → + Scan**, which lets the workbench register its
+`CODEX_SECURITY_SCAN_ID`. If the app reports that
+`start_codex_security_prompt_only_scan` is unavailable, update or reconcile the
+app/plugin integration; it is not fixed by granting broader Flatpak filesystem
+or D-Bus permissions. The same connector failure occurs directly in
+chatgpt.com: **Settings → Plugins → Codex Security** shows a Connect action, but
+its browser request sends `action_names: []` and receives
+`{"detail":"Connector not found"}`. That proves the failure is independent of
+this package and its `bwrap` fix. A second web capture shows **Failed to add
+connector link** with the connector's `noauth` request returning HTTP 404 while
+an adjacent request succeeds. It instead points to the ChatGPT connector
+catalog, entitlement or workspace policy, a stale plugin manifest, or rollout
+state. The wrapper here changes Codex command execution only.
 
 **The pet renders as an opaque box.** In order of likelihood:
 

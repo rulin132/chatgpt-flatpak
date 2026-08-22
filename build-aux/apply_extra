@@ -62,7 +62,25 @@ rm -rf ./usr ./opt ./etc ./lib ./var ./app
 mv ./app.tmp ./app
 printf 'APP_BIN=/app/extra/app/%s\n' "$BIN_NAME" > app.env
 
-# --- 5. check the Chromium sandbox ------------------------------------------
+# --- 5. adapt the Codex command sandbox to Flatpak --------------------------
+# Codex normally launches commands in its own bwrap/user-namespace sandbox.
+# Flatpak deliberately blocks nested user namespaces, so the bundled Codex
+# cannot create that inner sandbox. Replace only Codex's executable entrypoint
+# with a wrapper that selects danger-full-access; Flatpak remains the outer
+# sandbox and still limits files, D-Bus services, devices, and host execution.
+CODEX=app/resources/codex
+CODEX_WRAPPER=/app/libexec/chatgpt-flatpak/codex-flatpak-wrapper
+[ -f "$CODEX" ] || die "$CODEX missing, upstream payload layout changed"
+[ -x "$CODEX" ] || die "$CODEX is not executable, upstream payload layout changed"
+[ ! -e "$CODEX.real" ] || die "$CODEX.real already exists, upstream payload layout changed"
+[ -f "$CODEX_WRAPPER" ] || die "$CODEX_WRAPPER missing from the packaged app"
+[ -x "$CODEX_WRAPPER" ] || die "$CODEX_WRAPPER is not executable"
+
+mv "$CODEX" "$CODEX.real" || die "failed to preserve the real Codex executable"
+cp "$CODEX_WRAPPER" "$CODEX" || die "failed to install the Codex Flatpak wrapper"
+chmod 0755 "$CODEX" || die "failed to make the Codex Flatpak wrapper executable"
+
+# --- 6. check the Chromium sandbox ------------------------------------------
 # Asserts rather than installs. Upstream ships no chrome-sandbox and the
 # BaseApp ships no stub_sandbox; zypak takes over before Chromium looks for a
 # helper. Verified on 26.810.50856: the zygote runs under
@@ -76,7 +94,7 @@ if [ -e app/chrome-sandbox ] || [ -e app/chrome_sandbox ]; then
     die "upstream now ships a chrome-sandbox helper, its sandbox model changed; review before shipping (see docs/SECURITY.md)"
 fi
 
-# --- 6. fix the Wayland window icon / .desktop association ------------------
+# --- 7. fix the Wayland window icon / .desktop association ------------------
 # Electron reports "{productName}.desktop"; ours is io.github.rulin132.ChatGPT.
 # Cosmetic, so warn rather than abort if the asar format changes.
 if command -v patch-electron-desktop-filename >/dev/null 2>&1; then
@@ -86,7 +104,7 @@ if command -v patch-electron-desktop-filename >/dev/null 2>&1; then
         || echo "apply_extra: WARNING desktop-filename patch failed (window icon may be wrong)" >&2
 fi
 
-# --- 7. in-app updater ------------------------------------------------------
+# --- 8. in-app updater ------------------------------------------------------
 # Nothing to neuter. Checked against 26.810.50856: it logs enableUpdater=true
 # but never writes to /app, and ships no Squirrel or AppImage updater.
 #

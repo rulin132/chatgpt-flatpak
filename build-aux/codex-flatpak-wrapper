@@ -1,0 +1,8 @@
+#!/bin/sh
+# Codex's normal Linux sandbox needs a nested user namespace, which Flatpak
+# deliberately blocks. Flatpak is already the outer process sandbox, so tell
+# Codex not to create another one while preserving every original argument.
+set -eu
+
+wrapper_dir=$(CDPATH='' cd -P -- "$(dirname -- "$0")" && pwd)
+exec "$wrapper_dir/codex.real" -c 'sandbox_mode="danger-full-access"' "$@"

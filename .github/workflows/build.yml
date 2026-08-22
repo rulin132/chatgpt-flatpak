@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v5
       # Print the version: the runner's is older than a typical local one and
       # still flags SC2015, so green locally and red here look identical.
-      - run: shellcheck --version && shellcheck -x scripts/*.sh tests/*.sh build-aux/apply_extra build-aux/launcher.sh
+      - run: shellcheck --version && shellcheck -x scripts/*.sh tests/*.sh build-aux/apply_extra build-aux/launcher.sh build-aux/codex-flatpak-wrapper
       # ostree for test-merge-repos.sh.
       - run: sudo apt-get update && sudo apt-get install -y ostree
       - run: for t in tests/test-*.sh; do echo "== $t"; "$t" || exit 1; done

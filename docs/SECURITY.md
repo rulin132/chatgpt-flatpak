@@ -21,6 +21,32 @@ either would mean the sandbox model changed and a human should look.
 `--require-version=1.8.2` is in `finish-args` because zypak's faster spawn
 strategy needs `expose-pids`.
 
+**Codex commands use Flatpak as their process sandbox.** Codex normally uses
+`bwrap` and a user namespace to create its own command sandbox. A process
+already inside Flatpak cannot create that nested user namespace, so merely
+shipping another `bwrap` does not make command execution work. At install time
+this package preserves upstream's `app/resources/codex` as `codex.real` and
+puts a small wrapper at the original path. The wrapper passes
+`sandbox_mode="danger-full-access"` to Codex, the documented setting for an
+environment that already provides isolation.
+
+Here, "danger full access" is relative to the Flatpak, not the host. There are
+two potential layers:
+
+1. Codex's inner command sandbox is disabled because Flatpak prevents it from
+   being created.
+2. The outer Flatpak sandbox remains in force for Codex, its shell commands,
+   and the desktop app.
+
+Model-generated commands can therefore use everything already visible inside
+the Flatpak: explicitly granted workspace directories, app-persistent data in
+`.codex` and `.cache`, the shared network, runtime tools, devices, and allowed
+D-Bus services. They still cannot read arbitrary host files or execute host
+commands. Granting `--filesystem=host`, broad home access, or
+`--talk-name=org.freedesktop.Flatpak` would erase those protections and is not
+part of this compatibility fix. Chromium renderer and GPU process isolation
+continues to use zypak unchanged.
+
 **Sealed permissions.** Deliberately absent from `finish-args`:
 
 | Not granted | Why |
@@ -42,6 +68,39 @@ The trade is real: with a sealed sandbox the agent can only run commands against
 the tools inside the runtime, not your host toolchain. If you widen it to
 `--talk-name=org.freedesktop.Flatpak` to get host execution back, you have
 opted out of the sandbox. Do that knowingly, not by copying a snippet.
+
+## Codex Security scans
+
+Codex Security scans must be started from **Security → Scans → + Scan** so the
+workbench registers a `CODEX_SECURITY_SCAN_ID`. An error that the desktop
+capability `start_codex_security_prompt_only_scan` is unavailable is separate
+from command sandboxing. If it remains after this Codex wrapper fix, it points
+to an app/plugin version or feature-integration mismatch, not a missing Flatpak
+permission. Do not widen filesystem or D-Bus access to work around it.
+
+The connector failure has also been reproduced directly on chatgpt.com, outside
+the Flatpak. In **Settings → Plugins → Codex Security**, the web UI shows a
+**Connect** action for "Codex Security Access", while the browser's network
+request contains:
+
+```text
+connector_id: connector_openai_codex_security_access
+name: Codex Security Access
+action_names: []
+```
+
+The web request receives `{"detail":"Connector not found"}`. The web UI is
+therefore advertising a connector with no actions that the backend cannot
+resolve. A second chatgpt.com capture shows the **Connect Codex Security
+Access** modal reporting **Failed to add connector link**; its `noauth` network
+request returns HTTP 404 in about 216 ms while an adjacent request returns 200.
+Because these requests originate and fail in the web application, this is
+definitively independent of Flatpak packaging, permissions, networking, and the
+Codex `bwrap` command runner. Likely causes are the ChatGPT web/backend
+connector catalog, account entitlement or workspace policy, a stale plugin
+manifest, or a feature rollout mismatch. Filesystem grants, D-Bus grants, and
+host execution access cannot repair it. The local wrapper in this package
+remains scoped only to making Codex command execution work inside Flatpak.
 
 ## What this package does not do
 
