@@ -8,6 +8,32 @@ pass=0 fail=0
 ok()  { pass=$((pass + 1)); echo "  ok   $1"; }
 bad() { fail=$((fail + 1)); echo "  FAIL $1"; }
 
+discover_workflows() {
+    find "$1" -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) -print0 |
+        sort -z
+}
+
+mapfile -d '' -t workflow_files < <(discover_workflows "$REPO/.github/workflows")
+if [ "${#workflow_files[@]}" -gt 0 ]; then
+    ok "discovered executable workflow files"
+else
+    bad "no executable workflow files found"
+    exit 1
+fi
+
+# GitHub executes both supported extensions. Exercise discovery with a .yaml
+# fixture so a future regression to a *.yml-only glob fails this test.
+fixture=$(mktemp -d)
+printf 'name: fixture\n' > "$fixture/extension.yaml"
+printf 'ignored\n' > "$fixture/not-a-workflow.txt"
+mapfile -d '' -t fixture_files < <(discover_workflows "$fixture")
+if [ "${#fixture_files[@]}" -eq 1 ] && [ "${fixture_files[0]}" = "$fixture/extension.yaml" ]; then
+    ok "discovers the .yaml workflow extension"
+else
+    bad "must discover both .yml and .yaml workflow extensions"
+fi
+rm -rf "$fixture"
+
 echo "workflow security"
 
 # A mutable major tag can be repointed after review. All external actions must
@@ -22,7 +48,7 @@ while IFS=: read -r file line text; do
     else
         bad "$file:$line uses mutable action $ref"
     fi
-done < <(grep -HnE 'uses:[[:space:]]*[^[:space:]#]+' "$REPO"/.github/workflows/*.yml)
+done < <(grep -HnE 'uses:[[:space:]]*[^[:space:]#]+' "${workflow_files[@]}")
 
 # The build container executes while the signing key is present, so its tag
 # must resolve to one immutable manifest digest.
@@ -33,7 +59,7 @@ while IFS=: read -r file line text; do
     else
         bad "$file:$line uses mutable container $ref"
     fi
-done < <(grep -HnE 'image:[[:space:]]*[^[:space:]#]+' "$REPO"/.github/workflows/*.yml)
+done < <(grep -HnE 'image:[[:space:]]*[^[:space:]#]+' "${workflow_files[@]}")
 
 # No third-party upload or release action should run while the imported private
 # key remains on disk.
