@@ -107,6 +107,7 @@ rm -rf "$work"
 
 # Versions originate in upstream APT metadata and later become Actions
 # outputs. Reject shell metacharacters and XML delimiters before writing them.
+# shellcheck disable=SC2016 -- literal substitutions are the test inputs
 for bad_version in '1.2.3$(touch PWNED)' '1.2.3`id`' '1.2.3"/>' '1.2.3 with-space'; do
     out=$(run_case '    <release version="0.0.0" date="2026-08-14"/>
 ' "$bad_version" 2026-08-15)
@@ -132,6 +133,7 @@ run_blocks=$(awk '
         else print
     }
 ' "$REPO/.github/workflows/release.yml")
+# shellcheck disable=SC2016 -- literal Actions expressions are the test inputs
 for expression in \
     '${{ github.ref_name }}' '${{ steps.ver.outputs.v }}' \
     '${{ secrets.GITHUB_TOKEN }}' '${{ github.actor }}' \

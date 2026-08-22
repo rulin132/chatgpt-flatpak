@@ -159,6 +159,7 @@ rm -rf "$work"
 
 # The APT index is untrusted input. Reject a version containing shell syntax
 # before either the manifest or metainfo is changed.
+# shellcheck disable=SC2016 -- literal command substitution is the test input
 bad_version='27.100.11111$(touch-PWNED)'
 work=$(make_work "$bad_version" "$bad_version")
 before_manifest=$(cat "$work/test.ChatGPT.yaml")
