@@ -34,6 +34,20 @@
   <url type="homepage">https://openai.com/codex/</url>
   <url type="help">https://help.openai.com</url>
   <url type="bugtracker">https://github.com/rulin132/chatgpt-flatpak/issues</url>
+  <url type="vcs-browser">https://github.com/rulin132/chatgpt-flatpak</url>
+
+  <branding>
+    <color type="primary" scheme_preference="light">#ececf1</color>
+    <color type="primary" scheme_preference="dark">#343541</color>
+  </branding>
+
+  <keywords>
+    <keyword>ChatGPT</keyword>
+    <keyword>Codex</keyword>
+    <keyword>AI</keyword>
+    <keyword>assistant</keyword>
+    <keyword>chatbot</keyword>
+  </keywords>
 
   <content_rating type="oars-1.1">
     <content_attribute id="social-chat">intense</content_attribute>
