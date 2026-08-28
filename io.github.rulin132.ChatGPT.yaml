@@ -74,6 +74,9 @@ modules:
       - type: dir
         path: build-aux
 
+      - type: file
+        path: LICENSE
+
       # -- Vendor payload -----------------------------------------------------
       # extra-data is downloaded on the USER'S machine at install time. We never
       # host or redistribute OpenAI's bytes. sha256 + size are MANDATORY and are
