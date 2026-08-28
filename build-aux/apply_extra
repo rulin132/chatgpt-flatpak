@@ -104,7 +104,20 @@ if command -v patch-electron-desktop-filename >/dev/null 2>&1; then
         || echo "apply_extra: WARNING desktop-filename patch failed (window icon may be wrong)" >&2
 fi
 
-# --- 8. in-app updater ------------------------------------------------------
+# --- 8. fix terminal routing for newly-created local threads ----------------
+# Upstream 26.818 returns no terminal target while the route still carries a
+# client thread id. The empty bottom panel then opens and immediately closes.
+# Patch the bundled renderer in-place, preserving ASAR offsets and refreshing
+# its per-file integrity hashes. Fail on bundle drift so this workaround cannot
+# silently patch the wrong code after an upstream update.
+NODE=app/resources/cua_node/bin/node
+TERMINAL_ROUTE_PATCHER=/app/libexec/chatgpt-flatpak/patch-terminal-route.js
+[ -x "$NODE" ] || die "$NODE missing, upstream payload layout changed"
+[ -f "$TERMINAL_ROUTE_PATCHER" ] || die "$TERMINAL_ROUTE_PATCHER missing from the packaged app"
+"$NODE" "$TERMINAL_ROUTE_PATCHER" app/resources/app.asar \
+    || die "failed to patch client-local-thread terminal routing"
+
+# --- 9. in-app updater ------------------------------------------------------
 # Nothing to neuter. Checked against 26.810.50856: it logs enableUpdater=true
 # but never writes to /app, and ships no Squirrel or AppImage updater.
 #

@@ -62,6 +62,8 @@ modules:
       - install -Dm755 launcher.sh /app/bin/chatgpt-launcher
       - install -Dm755 codex-flatpak-wrapper
         /app/libexec/chatgpt-flatpak/codex-flatpak-wrapper
+      - install -Dm755 patch-terminal-route.js
+        /app/libexec/chatgpt-flatpak/patch-terminal-route.js
       # AppStream/desktop metadata MUST be installed at build time: the store
       # index has to exist before any extra-data is downloaded.
       - install -Dm644 io.github.rulin132.ChatGPT.desktop
