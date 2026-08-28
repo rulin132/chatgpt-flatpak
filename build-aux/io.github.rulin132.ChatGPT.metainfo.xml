@@ -36,6 +36,13 @@
   <url type="bugtracker">https://github.com/rulin132/chatgpt-flatpak/issues</url>
   <url type="vcs-browser">https://github.com/rulin132/chatgpt-flatpak</url>
 
+  <screenshots>
+    <screenshot type="default">
+      <caption>The Codex workspace view</caption>
+      <image>https://raw.githubusercontent.com/rulin132/chatgpt-flatpak/main/docs/screenshots/codex-home.png</image>
+    </screenshot>
+  </screenshots>
+
   <branding>
     <color type="primary" scheme_preference="light">#ececf1</color>
     <color type="primary" scheme_preference="dark">#343541</color>
