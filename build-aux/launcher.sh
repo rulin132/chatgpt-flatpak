@@ -34,6 +34,18 @@ fi
 export TMPDIR="${XDG_CACHE_HOME:-$HOME/.cache}/tmp"
 mkdir -p "$TMPDIR"
 
+# The Freedesktop runtime intentionally does not ship Git. ChatGPT downloads a
+# confined primary runtime that includes Git, but its main process does not add
+# that fallback directory to PATH. The integrated terminal asks the Git manager
+# for worktree environment variables before spawning the PTY, so without this
+# it fails with "Git is unavailable" and the empty bottom panel collapses.
+# Only use the app-managed runtime when it is present; first launch remains
+# functional while that runtime is still being installed.
+PRIMARY_RUNTIME_FALLBACK_BIN="$PREFIX$HOME/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback"
+if [ -x "$PRIMARY_RUNTIME_FALLBACK_BIN/git" ]; then
+    export PATH="$PRIMARY_RUNTIME_FALLBACK_BIN:$PATH"
+fi
+
 # --enable-wayland-ime is what fixes IME input on Fedora/GNOME Wayland.
 set -- --ozone-platform-hint=auto --enable-wayland-ime "$@"
 

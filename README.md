@@ -34,6 +34,34 @@ for example your Desktop:
 flatpak override --user --filesystem=~/Desktop io.github.rulin132.ChatGPT
 ```
 
+### Project access
+
+Grant each project you want Codex to use as a persistent, narrow filesystem
+permission. For example:
+
+```sh
+flatpak override --user \
+  --filesystem=~/code/my-project \
+  io.github.rulin132.ChatGPT
+```
+
+Then open the project in the app using its stable path, such as
+`~/code/my-project`. A directory selected through the desktop file picker may
+instead appear inside the sandbox as `/run/flatpak/doc/...`. That document
+portal path can disappear or become stale after the app restarts. Existing
+tasks may then report `getcwd` or `Git is unavailable`, and the integrated
+terminal can briefly open and immediately close.
+
+This does **not** require `--filesystem=host` or access to your whole home
+directory. Grant only the repository (or the smallest parent directory you
+actually want the app to use). Revoke a project grant with:
+
+```sh
+flatpak override --user \
+  --nofilesystem=~/code/my-project \
+  io.github.rulin132.ChatGPT
+```
+
 Also published as an OCI image at `ghcr.io/rulin132/chatgpt-flatpak`, for
 mirroring and offline installs. Fetch it with a registry client first: pointing
 flatpak straight at `docker://` returns 401, because it does not complete the
