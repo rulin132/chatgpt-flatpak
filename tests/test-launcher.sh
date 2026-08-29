@@ -22,6 +22,8 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
 mkdir -p "$work/stub"
+# These expansions belong to the generated stub and must not run here.
+# shellcheck disable=SC2016
 printf '#!/bin/sh\necho "ZYPAK_EXEC $*"\nprintf "GIT_EXEC %%s\\n" "$(command -v git 2>/dev/null || true)"\n' > "$work/stub/zypak-wrapper"
 chmod +x "$work/stub/zypak-wrapper"
 export PATH="$work/stub:$PATH"
