@@ -22,7 +22,7 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
 mkdir -p "$work/stub"
-printf '#!/bin/sh\necho "ZYPAK_EXEC $*"\n' > "$work/stub/zypak-wrapper"
+printf '#!/bin/sh\necho "ZYPAK_EXEC $*"\nprintf "GIT_EXEC %%s\\n" "$(command -v git 2>/dev/null || true)"\n' > "$work/stub/zypak-wrapper"
 chmod +x "$work/stub/zypak-wrapper"
 export PATH="$work/stub:$PATH"
 
@@ -66,6 +66,20 @@ root=$(mkroot nonvidia)
 run_launcher "$root"
 check "no nvidia: no warning" "$(wc -c < "$err")" "0"
 check "no nvidia: execs the app" \
+    "$(grep -c '^ZYPAK_EXEC /fake/ChatGPT' "$out")" "1"
+
+# The desktop process must see Git from the already-downloaded primary runtime.
+# Terminal startup resolves worktree environment before creating the PTY and
+# otherwise fails with "Git is unavailable".
+root=$(mkroot gitfallback)
+fallback="$root$HOME/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback"
+mkdir -p "$fallback"
+printf '#!/bin/sh\necho primary-runtime-git\n' > "$fallback/git"
+chmod +x "$fallback/git"
+run_launcher "$root"
+check "primary runtime Git: prepended to PATH" \
+    "$(sed -n 's/^GIT_EXEC //p' "$out")" "$fallback/git"
+check "primary runtime Git: launcher still execs the app" \
     "$(grep -c '^ZYPAK_EXEC /fake/ChatGPT' "$out")" "1"
 
 # Missing app.env still fails closed with the reinstall hint.
