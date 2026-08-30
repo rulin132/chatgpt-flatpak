@@ -178,9 +178,26 @@ jobs:
           if [ -n "${GNUPGHOME:-}" ]; then
             rm -rf -- "$GNUPGHOME"
           fi
-      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+      # upload-pages-artifact internally calls upload-artifact@v4 (unpinned tag),
+      # which the repository's Actions policy rejects. Inline its steps instead:
+      # create the tar archive manually and upload it via the already-allowed
+      # upload-artifact action.
+      - name: archive Pages artifact
+        run: |
+          tar \
+            --dereference --hard-dereference \
+            --directory public \
+            -cf "$RUNNER_TEMP/artifact.tar" \
+            --exclude=.git \
+            --exclude=.github \
+            .
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          path: public
+          name: github-pages
+          path: ${{ runner.temp }}/artifact.tar
+          retention-days: 1
+          if-no-files-found: error
 
       # Built here because only this container has flatpak, but pushed from a
       # separate job. This image ships no registry client at all, no skopeo,

@@ -66,7 +66,10 @@ done < <(grep -HnE 'image:[[:space:]]*[^[:space:]#]+' "${workflow_files[@]}")
 release=$REPO/.github/workflows/release.yml
 # shellcheck disable=SC2016
 cleanup_line=$(grep -nF 'rm -rf -- "$GNUPGHOME"' "$release" | cut -d: -f1)
-first_upload_line=$(grep -n 'uses: actions/upload-pages-artifact@' "$release" | cut -d: -f1)
+# upload-pages-artifact was inlined; the next third-party upload is upload-artifact.
+# Find the first upload-artifact that appears after the cleanup step.
+first_upload_line=$(grep -n 'uses: actions/upload-artifact@' "$release" \
+    | awk -F: -v cl="$cleanup_line" '$1 > cl {print $1; exit}')
 if [ -n "$cleanup_line" ] && [ -n "$first_upload_line" ] \
     && [ "$cleanup_line" -lt "$first_upload_line" ]; then
     ok "signing key is removed before third-party upload actions"
