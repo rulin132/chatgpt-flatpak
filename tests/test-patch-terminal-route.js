@@ -24,6 +24,14 @@ const source = Buffer.from(
     `cwd:e.get(cwd),hostId:e.get(host)};${vulnerableTail}}}`,
 );
 
+function sourceWithPrefix(resolverPrefix) {
+  return Buffer.from(
+    source
+      .toString()
+      .replace("function route(e){switch(e.value.routeKind){", resolverPrefix),
+  );
+}
+
 function hash(buffer) {
   return crypto.createHash("sha256").update(buffer).digest("hex");
 }
@@ -125,13 +133,41 @@ try {
   assert.strictEqual(result.status, 0, result.stderr);
   assert.match(result.stdout, /already patched/);
 
+  const guardedPath = path.join(work, "guarded.asar");
+  makeAsar(
+    guardedPath,
+    sourceWithPrefix(
+      "function W(e){if(e.get(_))return null;switch(e.value.routeKind){",
+    ),
+  );
+  result = run("--check", guardedPath);
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.match(result.stdout, /would patch/);
+
+  for (const [name, resolverPrefix] of [
+    [
+      "wrong-guard-parameter",
+      "function W(e){if(t.get(_))return null;switch(e.value.routeKind){",
+    ],
+    [
+      "wrong-switch-parameter",
+      "function W(e){if(e.get(_))return null;switch(t.value.routeKind){",
+    ],
+  ]) {
+    const unexpectedShapePath = path.join(work, `${name}.asar`);
+    makeAsar(unexpectedShapePath, sourceWithPrefix(resolverPrefix));
+    result = run("--check", unexpectedShapePath);
+    assert.notStrictEqual(result.status, 0);
+    assert.match(result.stderr, /terminal resolver shape changed/);
+  }
+
   const unsupportedPath = path.join(work, "unsupported.asar");
   makeAsar(unsupportedPath, Buffer.from("console.log('upstream changed')"));
   result = run(unsupportedPath);
   assert.notStrictEqual(result.status, 0);
   assert.match(result.stderr, /review the upstream bundle/);
 
-  console.log("patch-terminal-route: 4 ok, 0 failed");
+  console.log("patch-terminal-route: 7 ok, 0 failed");
 } finally {
   fs.rmSync(work, { force: true, recursive: true });
 }
