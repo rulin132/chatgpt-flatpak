@@ -71,7 +71,7 @@ opted out of the sandbox. Do that knowingly, not by copying a snippet.
 
 ## Chrome native messaging
 
-The browser controller / Chrome extension native transport is unsupported in this Flatpak package, including when Chrome itself runs as a Flatpak. The extension may report `Native transport disconnected`, and the desktop app may show Chrome as “Not installed” even when the extension is installed. These symptoms do not mean broader Flatpak permissions are needed.
+The browser controller / Chrome extension native transport is unsupported in this Flatpak package, including when Chrome itself runs as a Flatpak. The extension may report `Native transport disconnected`, and the desktop app may show Chrome as "Not installed" even when the extension is installed. These symptoms do not mean broader Flatpak permissions are needed.
 
 A local native-messaging bridge experiment was withdrawn because it stored a host executable in data writable by the Flatpak. Code running inside the sandbox could modify that executable and change what Chrome later runs outside the sandbox. This experiment was not a supported package feature.
 
