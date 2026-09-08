@@ -66,8 +66,9 @@ printf 'APP_BIN=/app/extra/app/%s\n' "$BIN_NAME" > app.env
 # Codex normally launches commands in its own bwrap/user-namespace sandbox.
 # Flatpak deliberately blocks nested user namespaces, so the bundled Codex
 # cannot create that inner sandbox. Replace only Codex's executable entrypoint
-# with a wrapper that selects danger-full-access; Flatpak remains the outer
-# sandbox and still limits files, D-Bus services, devices, and host execution.
+# with a wrapper that bypasses Codex's inner approvals and sandbox; Flatpak
+# remains the outer sandbox and still limits files, D-Bus services, devices,
+# and host execution.
 CODEX=app/resources/codex
 CODEX_WRAPPER=/app/libexec/chatgpt-flatpak/codex-flatpak-wrapper
 [ -f "$CODEX" ] || die "$CODEX missing, upstream payload layout changed"

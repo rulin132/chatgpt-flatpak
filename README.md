@@ -89,8 +89,8 @@ content inherits every permission the flatpak holds.
 Codex command execution uses Flatpak itself as the outer sandbox. Flatpak
 prevents Codex from creating its normal nested `bwrap` user namespace, so this
 package wraps the bundled Codex executable with
-`sandbox_mode="danger-full-access"`. Despite the setting's name, commands do
-not gain host access: they get only what the Flatpak can already see, including
+`--dangerously-bypass-approvals-and-sandbox`. Despite the flag's name, commands
+do not gain host access: they get only what the Flatpak can already see, including
 directories you explicitly grant, app-persistent data, network access, runtime
 tools, and allowed D-Bus services. They cannot read arbitrary host files or run
 host commands. Chromium renderer isolation under zypak is unchanged. See
