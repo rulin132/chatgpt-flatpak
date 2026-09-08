@@ -24,7 +24,7 @@ trap 'rm -rf "$work"' EXIT
 mkdir -p "$work/stub"
 # These expansions belong to the generated stub and must not run here.
 # shellcheck disable=SC2016
-printf '#!/bin/sh\necho "ZYPAK_EXEC $*"\nprintf "GIT_EXEC %%s\\n" "$(command -v git 2>/dev/null || true)"\n' > "$work/stub/zypak-wrapper"
+printf '#!/bin/sh\necho "ZYPAK_EXEC $*"\nprintf "TMPDIR_EXEC %%s\\n" "$TMPDIR"\nprintf "GIT_EXEC %%s\\n" "$(command -v git 2>/dev/null || true)"\n' > "$work/stub/zypak-wrapper"
 chmod +x "$work/stub/zypak-wrapper"
 export PATH="$work/stub:$PATH"
 
@@ -40,7 +40,7 @@ mkroot() {  # mkroot <name>; prints the root path
 run_launcher() {  # run_launcher <root>; stdout to $out, stderr to $err, rc set
     err=$work/err; out=$work/out; copy=$work/launcher-copy.sh
     sed "s|^PREFIX=\$|PREFIX=$1|" "$LAUNCHER" > "$copy"
-    XDG_CACHE_HOME=$work/cache sh "$copy" >"$out" 2>"$err" && rc=0 || rc=$?
+    XDG_CACHE_HOME=$work/cache XDG_RUNTIME_DIR=$work/runtime sh "$copy" >"$out" 2>"$err" && rc=0 || rc=$?
 }
 
 # NVIDIA node without a mounted GL/nvidia-* dir is the driver/extension
@@ -70,6 +70,15 @@ check "no nvidia: no warning" "$(wc -c < "$err")" "0"
 check "no nvidia: execs the app" \
     "$(grep -c '^ZYPAK_EXEC /fake/ChatGPT' "$out")" "1"
 
+# Chromium creates SingletonSocket below TMPDIR. A cache-based TMPDIR can make
+# this path exceed Linux's 107-character Unix-socket pathname limit.
+check "runtime TMPDIR: uses the short runtime directory" \
+    "$(sed -n 's/^TMPDIR_EXEC //p' "$out")" "$work/runtime/chatgpt"
+check "runtime TMPDIR: is private" \
+    "$(stat -c '%a' "$work/runtime/chatgpt")" "700"
+socket_path="/run/user/1000/chatgpt/org.chromium.Chromium.1234567890/SingletonSocket"
+check "runtime TMPDIR: representative SingletonSocket path fits" \
+    "$( [ "${#socket_path}" -le 107 ] && echo fits || echo too-long )" "fits"
 # The desktop process must see Git from the already-downloaded primary runtime.
 # Terminal startup resolves worktree environment before creating the PTY and
 # otherwise fails with "Git is unavailable".
