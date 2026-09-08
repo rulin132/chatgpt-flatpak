@@ -69,6 +69,18 @@ the tools inside the runtime, not your host toolchain. If you widen it to
 `--talk-name=org.freedesktop.Flatpak` to get host execution back, you have
 opted out of the sandbox. Do that knowingly, not by copying a snippet.
 
+## Chrome native messaging
+
+The browser controller / Chrome extension native transport is unsupported in this Flatpak package, including when Chrome itself runs as a Flatpak. The extension may report `Native transport disconnected`, and the desktop app may show Chrome as "Not installed" even when the extension is installed. These symptoms do not mean broader Flatpak permissions are needed.
+
+A local native-messaging bridge experiment was withdrawn because it stored a host executable in data writable by the Flatpak. Code running inside the sandbox could modify that executable and change what Chrome later runs outside the sandbox. This experiment was not a supported package feature.
+
+This design is consistent with [CWE-732: Incorrect Permission Assignment for Critical Resource](https://cwe.mitre.org/data/definitions/732.html): sandboxed code could modify code that would later execute on the host. CWE-732 is a general weakness classification, not a published advisory or CVE for this package.
+
+There is no supported permission workaround, including a temporary one. A temporary filesystem grant does not protect a persistent host wrapper when the Flatpak can modify it later. Granting `org.freedesktop.Flatpak` access to enable `flatpak-spawn --host`, or broad host filesystem access, would weaken the intended sandbox without fixing that design.
+
+Any future integration would need a separate security assessment. Host-executed code and its configuration must remain outside Flatpak-writable storage, including writable parent directories and symlink targets; protecting those files alone would not establish that the communication channel is safe.
+
 ## Codex Security scans
 
 Codex Security scans must be started from **Security → Scans → + Scan** so the
