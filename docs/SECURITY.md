@@ -27,10 +27,10 @@ already inside Flatpak cannot create that nested user namespace, so merely
 shipping another `bwrap` does not make command execution work. At install time
 this package preserves upstream's `app/resources/codex` as `codex.real` and
 puts a small wrapper at the original path. The wrapper passes
-`sandbox_mode="danger-full-access"` to Codex, the documented setting for an
-environment that already provides isolation.
+`--dangerously-bypass-approvals-and-sandbox` to Codex because the
+environment already provides isolation.
 
-Here, "danger full access" is relative to the Flatpak, not the host. There are
+The bypass flag applies to Codex's inner layer, not the Flatpak or host.
 two potential layers:
 
 1. Codex's inner command sandbox is disabled because Flatpak prevents it from

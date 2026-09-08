@@ -16,7 +16,7 @@ printf '%s\n' '#!/bin/sh' 'printf "%s\\n" "$@"' > "$work/resources/codex.real"
 chmod +x "$work/resources/codex" "$work/resources/codex.real"
 
 actual=$(cd "$work/elsewhere" && "$work/resources/codex" app-server --flag 'two words')
-expected=$(printf '%s\n' -c 'sandbox_mode="danger-full-access"' app-server --flag 'two words')
+expected=$(printf '%s\n' --dangerously-bypass-approvals-and-sandbox app-server --flag 'two words')
 
 if [ "$actual" != "$expected" ]; then
     echo "FAIL: wrapper changed option ordering or caller arguments" >&2

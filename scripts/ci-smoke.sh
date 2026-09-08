@@ -47,8 +47,8 @@ flatpak run --command=sh "$app_id" -c '
   head -c4 "$APP_BIN" | grep -q ELF || { echo "APP_BIN is not an ELF binary"; exit 1; }
   test -f /app/extra/app/resources/app.asar || { echo "no app.asar"; exit 1; }
   test -x /app/extra/app/resources/codex || { echo "Codex wrapper missing"; exit 1; }
-  grep -Fq "sandbox_mode=\"danger-full-access\"" /app/extra/app/resources/codex || {
-    echo "Codex wrapper does not select danger-full-access"
+  grep -Fq -- "--dangerously-bypass-approvals-and-sandbox" /app/extra/app/resources/codex || {
+    echo "Codex wrapper does not bypass its unavailable inner sandbox"
     exit 1
   }
   test -x /app/extra/app/resources/codex.real || { echo "real Codex binary missing"; exit 1; }

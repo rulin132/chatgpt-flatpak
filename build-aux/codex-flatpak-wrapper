@@ -5,4 +5,4 @@
 set -eu
 
 wrapper_dir=$(CDPATH='' cd -P -- "$(dirname -- "$0")" && pwd)
-exec "$wrapper_dir/codex.real" -c 'sandbox_mode="danger-full-access"' "$@"
+exec "$wrapper_dir/codex.real" --dangerously-bypass-approvals-and-sandbox "$@"
