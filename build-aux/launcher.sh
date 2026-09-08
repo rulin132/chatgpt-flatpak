@@ -31,8 +31,12 @@ extension is mounted; rendering falls back to software and window transparency \
 breaks. Run 'flatpak update', then restart the app." >&2
 fi
 
-export TMPDIR="${XDG_CACHE_HOME:-$HOME/.cache}/tmp"
+# Chromium creates its SingletonSocket under TMPDIR. Flatpak cache paths can
+# already be long enough on Atomic desktops to exceed the Unix socket limit.
+# Keep temporary files session-scoped and close to the short runtime root.
+export TMPDIR="${XDG_RUNTIME_DIR:-/tmp}/chatgpt"
 mkdir -p "$TMPDIR"
+chmod 700 "$TMPDIR"
 
 # The Freedesktop runtime intentionally does not ship Git. ChatGPT downloads a
 # confined primary runtime that includes Git, but its main process does not add
