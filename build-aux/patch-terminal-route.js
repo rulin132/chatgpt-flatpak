@@ -115,7 +115,7 @@ try {
       if (
         homeIndex === -1 ||
         tailIndex - homeIndex > 700 ||
-        !/function\s+[A-Za-z_$][\w$]*\([A-Za-z_$][\w$]*\)\{switch\([A-Za-z_$][\w$]*\.value\.routeKind\)\{$/.test(
+        !/function\s+[A-Za-z_$][\w$]*\(([A-Za-z_$][\w$]*)\)\{(?:if\(\1\.get\([A-Za-z_$][\w$]*\)\)return null;)?switch\(\1\.value\.routeKind\)\{$/.test(
           resolverPrefix,
         ) ||
         !resolverBody.includes(".value.clientThreadId") ||
