@@ -119,6 +119,14 @@ flatpak override --user --reset io.github.rulin132.ChatGPT
 Read [docs/SECURITY.md](docs/SECURITY.md) before widening it, particularly the
 part about why this is not a trust boundary you should put client work behind.
 
+## Chrome integration
+
+**The browser controller / Chrome extension native transport is unsupported in this Flatpak package, including when Chrome is also installed as a Flatpak.** Installing the Chrome extension does not enable this connection. The extension may report `Native transport disconnected`, while the desktop app shows Chrome as “Not installed” even when the extension is installed.
+
+A local native-messaging bridge experiment was withdrawn because its host wrapper was stored in app-writable data. Code inside the sandbox could modify what Chrome later executes on the host. This experiment was not a supported package feature.
+
+There is no supported permission workaround. Granting general host execution through `org.freedesktop.Flatpak` / `flatpak-spawn --host`, or broad filesystem access, would weaken the sandbox without making the withdrawn bridge safe. A temporary permission grant does not protect a host wrapper that the Flatpak can still modify later. See [the security rationale](docs/SECURITY.md#chrome-native-messaging) for details.
+
 ## Maintaining it
 I'm not the only one that can maintain it, you can too, simple as forking this repository and running the following.
 
@@ -190,6 +198,8 @@ It opens with its window. Starting minimized to the tray would need a flag from
 the app itself, which upstream has not added.
 
 ## Known issues
+
+**Browser controller / Chrome extension: `Native transport disconnected` or Chrome “Not installed”.** Chrome extension native transport is unsupported by this Flatpak package, including with Chrome Flatpak. Installing the extension or widening Flatpak permissions is not a supported fix. See [Chrome integration](#chrome-integration).
 
 If something misbehaves, capture the log first:
 
