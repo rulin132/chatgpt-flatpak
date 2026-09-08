@@ -121,11 +121,11 @@ part about why this is not a trust boundary you should put client work behind.
 
 ## Chrome integration
 
-**The browser controller / Chrome extension native transport is unsupported in this Flatpak package, including when Chrome is also installed as a Flatpak.** Installing the Chrome extension does not enable this connection. The extension may report `Native transport disconnected`, while the desktop app shows Chrome as “Not installed” even when the extension is installed.
+**The browser controller / Chrome extension native transport is unsupported in this Flatpak package, including when Chrome is also installed as a Flatpak.** Installing the Chrome extension does not enable this connection. The extension may report `Native transport disconnected`, while the desktop app shows Chrome as "Not installed" even when the extension is installed.
 
 A local native-messaging bridge experiment was withdrawn because its host wrapper was stored in app-writable data. Code inside the sandbox could modify what Chrome later executes on the host. This experiment was not a supported package feature.
 
-There is no supported permission workaround. Granting general host execution through `org.freedesktop.Flatpak` / `flatpak-spawn --host`, or broad filesystem access, would weaken the sandbox without making the withdrawn bridge safe. A temporary permission grant does not protect a host wrapper that the Flatpak can still modify later. See [the security rationale](docs/SECURITY.md#chrome-native-messaging) for details.
+There is no supported permission workaround. Granting general host execution through `--talk-name=org.freedesktop.Flatpak` / `flatpak-spawn --host`, or broad filesystem access, would weaken the sandbox without making the withdrawn bridge safe. A temporary permission grant does not protect a host wrapper that the Flatpak can still modify later. See [the security rationale](docs/SECURITY.md#chrome-native-messaging) for details.
 
 ## Maintaining it
 I'm not the only one that can maintain it, you can too, simple as forking this repository and running the following.
