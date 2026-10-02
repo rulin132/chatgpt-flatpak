@@ -19,7 +19,7 @@ concurrency:
 jobs:
   # Not in the flatpak container: it ships neither dnf nor shellcheck.
   shellcheck:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       # Print the version: the runner's is older than a typical local one and
@@ -30,7 +30,7 @@ jobs:
       - run: for t in tests/test-*.sh; do echo "== $t"; "$t" || exit 1; done
 
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08@sha256:6f3180c6765cb55e5dcd8ee4127b82aba25163c8c655a161422b7c447c14e4af
       options: --privileged
@@ -56,7 +56,7 @@ jobs:
       matrix:
         include:
           - arch: x86_64
-            runner: ubuntu-latest
+            runner: ubuntu-24.04
           - arch: aarch64
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
