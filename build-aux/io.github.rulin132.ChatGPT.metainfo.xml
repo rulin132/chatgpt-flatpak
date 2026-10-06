@@ -71,10 +71,10 @@
        scripts/ci-smoke.sh asserts the installed payload matches this one, so
        an out-of-order list fails CI on every architecture. -->
   <releases>
+    <release version="26.930.61225" date="2026-10-06"/>
     <release version="26.930.51102" date="2026-10-05"/>
     <release version="26.930.41038" date="2026-10-04"/>
     <release version="26.930.31730" date="2026-10-03"/>
     <release version="26.930.21537" date="2026-10-02"/>
-    <release version="26.928.31416" date="2026-10-01"/>
   </releases>
 </component>
