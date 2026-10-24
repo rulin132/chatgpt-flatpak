@@ -161,7 +161,7 @@ None of this is optional, and nothing here is created for you.
   until you change it under Packages, package settings, change visibility.
 - Allow auto-merge, under General. Without it the auto-merge step errors out.
 - Branch protection on `main` requiring these four checks: `shellcheck`,
-  `lint`, `build (x86_64, ubuntu-latest)`, `build (aarch64, ubuntu-24.04-arm)`.
+  `lint`, `build (x86_64, ubuntu-24.04)`, `build (aarch64, ubuntu-24.04-arm)`.
 
 **Labels and variables**
 

@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       # GitHub's recursion guard: nothing GITHUB_TOKEN does creates a workflow
       # run. A PR opened with it gets zero checks, so with AUTO_UPDATE on it
