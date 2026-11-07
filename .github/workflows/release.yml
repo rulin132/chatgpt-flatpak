@@ -33,7 +33,7 @@ jobs:
       matrix:
         include:
           - arch: x86_64
-            runner: ubuntu-latest
+            runner: ubuntu-24.04
           - arch: aarch64
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
@@ -79,7 +79,7 @@ jobs:
 
   publish:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.ver.outputs.v }}
     container:
@@ -233,12 +233,12 @@ jobs:
                 flatpak remote-add --user chatgpt https://rulin132.github.io/chatgpt-flatpak/chatgpt.flatpakrepo
                 flatpak install --user chatgpt io.github.rulin132.ChatGPT
 
-  # Plain ubuntu-latest, not the flatpak container, because that container has no
+  # Plain ubuntu-24.04, not the flatpak container, because that container has no
   # registry client and no package manager to install one. Runs after publish, so
   # a failure here costs only the OCI channel: Pages and the release are done.
   ghcr:
     needs: publish
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       packages: write
     steps:
@@ -268,7 +268,7 @@ jobs:
 
   deploy-pages:
     needs: publish
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
@@ -287,7 +287,7 @@ jobs:
   # already public. It reports rather than prevents.
   verify-published-remote:
     needs: [publish, deploy-pages]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       # ci-smoke.sh reads build-aux/*.metainfo.xml to check the installed
       # payload against the version this release claims, so it needs the tree.
