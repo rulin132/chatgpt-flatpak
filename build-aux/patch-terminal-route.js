@@ -14,10 +14,29 @@
 const crypto = require("crypto");
 const fs = require("fs");
 
-const CLIENT_CASE = "case`client-local-thread`:";
-const HOME_CASE = "case`home`:";
-const PATCHED_PREFIX = `${CLIENT_CASE}${HOME_CASE}`;
-const NULL_ROUTE_GROUP = /(?:case`[^`]+`:)+return null/g;
+const CASE_LABEL_SOURCE = "case(?:`[^`]+`|\"[^\"]+\"|'[^']+')\\s*:";
+const NULL_ROUTE_GROUP = new RegExp(
+  `(?:${CASE_LABEL_SOURCE}\\s*)+return\\s+null\\b;?`,
+  "g",
+);
+
+function routeCasePattern(kind, flags = "") {
+  return new RegExp(`case(?:\`${kind}\`|"${kind}"|'${kind}')\\s*:`, flags);
+}
+
+function lastRouteCase(source, kind, before) {
+  const pattern = routeCasePattern(kind, "g");
+  let match;
+  let last;
+  while ((match = pattern.exec(source)) && match.index < before) {
+    last = match;
+  }
+  return last;
+}
+
+function hasRouteCase(source, kind) {
+  return routeCasePattern(kind).test(source);
+}
 
 function die(message) {
   console.error(`patch-terminal-route: ${message}`);
@@ -116,29 +135,47 @@ try {
     const source = contents.toString("utf8");
     const nullRouteGroups = [...source.matchAll(NULL_ROUTE_GROUP)];
     for (const group of nullRouteGroups) {
-      const clientOffset = group[0].indexOf(CLIENT_CASE);
-      if (clientOffset === -1) {
+      const clientMatch = routeCasePattern("client-local-thread").exec(group[0]);
+      if (!clientMatch) {
         continue;
       }
-      if (group[0].indexOf(CLIENT_CASE, clientOffset + CLIENT_CASE.length) !== -1) {
+      if (
+        routeCasePattern("client-local-thread", "g").test(
+          group[0].slice(clientMatch.index + clientMatch[0].length),
+        )
+      ) {
         die(`multiple vulnerable resolvers in ${file.path}`);
       }
 
-      const clientIndex = group.index + clientOffset;
-      const homeIndex = source.lastIndexOf(HOME_CASE, clientIndex);
+      const clientIndex = group.index + clientMatch.index;
+      const homeMatch = lastRouteCase(source, "home", clientIndex);
+      const homeIndex = homeMatch ? homeMatch.index : -1;
       if (homeIndex === -1 || !resolverShape(source, homeIndex, clientIndex)) {
         die(`terminal resolver shape changed in ${file.path}`);
       }
-      vulnerable.push({ clientIndex, contents, file, homeIndex, position, source });
+      vulnerable.push({
+        clientIndex,
+        clientLabel: clientMatch[0],
+        contents,
+        file,
+        homeIndex,
+        position,
+        source,
+      });
     }
 
-    let patchedPrefixIndex = source.indexOf(PATCHED_PREFIX);
-    while (patchedPrefixIndex !== -1) {
-      const homeIndex = patchedPrefixIndex + CLIENT_CASE.length;
-      if (resolverShape(source, homeIndex, homeIndex + 700, patchedPrefixIndex)) {
+    const patchedClientCases = routeCasePattern("client-local-thread", "g");
+    let patchedMatch;
+    while ((patchedMatch = patchedClientCases.exec(source))) {
+      const homeIndex = patchedMatch.index + patchedMatch[0].length;
+      const homeMatch = routeCasePattern("home").exec(source.slice(homeIndex));
+      if (
+        homeMatch &&
+        homeMatch.index === 0 &&
+        resolverShape(source, homeIndex, homeIndex + 700, patchedMatch.index)
+      ) {
         alreadyPatched += 1;
       }
-      patchedPrefixIndex = source.indexOf(PATCHED_PREFIX, patchedPrefixIndex + 1);
     }
   }
 
@@ -155,8 +192,8 @@ try {
 
   const target = vulnerable[0];
   const beforeClient = target.source.slice(target.homeIndex, target.clientIndex);
-  const originalSpan = `${beforeClient}${CLIENT_CASE}`;
-  const patchedSpan = `${CLIENT_CASE}${beforeClient}`;
+  const originalSpan = `${beforeClient}${target.clientLabel}`;
+  const patchedSpan = `${target.clientLabel}${beforeClient}`;
   if (Buffer.byteLength(originalSpan) !== Buffer.byteLength(patchedSpan)) {
     die("internal error: terminal route rewrite changed byte length");
   }
@@ -172,9 +209,10 @@ try {
   patchedContents.write(patchedSpan, homeByteOffset, "utf8");
   const verified = patchedContents.toString("utf8");
   const stillVulnerable = [...verified.matchAll(NULL_ROUTE_GROUP)].some((group) =>
-    group[0].includes(CLIENT_CASE),
+    hasRouteCase(group[0], "client-local-thread"),
   );
-  if (!verified.includes(PATCHED_PREFIX) || stillVulnerable) {
+  const patchedClientIndex = verified.indexOf(patchedSpan);
+  if (patchedClientIndex === -1 || stillVulnerable) {
     die("internal error: terminal route rewrite did not verify");
   }
 
