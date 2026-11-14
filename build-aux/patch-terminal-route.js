@@ -17,12 +17,7 @@ const fs = require("fs");
 const CLIENT_CASE = "case`client-local-thread`:";
 const HOME_CASE = "case`home`:";
 const PATCHED_PREFIX = `${CLIENT_CASE}${HOME_CASE}`;
-const VULNERABLE_TAIL =
-  "case`new-thread-panel`:case`chatgpt-thread`:case`client-local-thread`:" +
-  "case`remote-thread`:case`other`:return null";
-const PATCHED_TAIL =
-  "case`new-thread-panel`:case`chatgpt-thread`:case`remote-thread`:" +
-  "case`other`:return null";
+const NULL_ROUTE_GROUP = /(?:case`[^`]+`:)+return null/g;
 
 function die(message) {
   console.error(`patch-terminal-route: ${message}`);
@@ -60,6 +55,21 @@ function updateIntegrity(entry, contents) {
   for (let offset = 0; offset < contents.length; offset += blockSize) {
     integrity.blocks.push(digest(contents.subarray(offset, offset + blockSize)));
   }
+}
+
+function resolverShape(source, homeIndex, routeIndex, prefixIndex = homeIndex) {
+  const resolverPrefix = source.slice(Math.max(0, prefixIndex - 100), prefixIndex);
+  const resolverBody = source.slice(homeIndex, routeIndex);
+  return (
+    routeIndex - homeIndex <= 700 &&
+    /function\s+[A-Za-z_$][\w$]*\(([A-Za-z_$][\w$]*)\)\{(?:if\(\1\.get\([A-Za-z_$][\w$]*\)\)return null;)?switch\(\1\.value\.routeKind\)\{$/.test(
+      resolverPrefix,
+    ) &&
+    resolverBody.includes(".value.clientThreadId") &&
+    resolverBody.includes("conversationId:") &&
+    resolverBody.includes("cwd:") &&
+    resolverBody.includes("hostId:")
+  );
 }
 
 const args = process.argv.slice(2);
@@ -104,44 +114,31 @@ try {
     }
 
     const source = contents.toString("utf8");
-    const tailIndex = source.indexOf(VULNERABLE_TAIL);
-    if (tailIndex !== -1) {
-      if (source.indexOf(VULNERABLE_TAIL, tailIndex + 1) !== -1) {
+    const nullRouteGroups = [...source.matchAll(NULL_ROUTE_GROUP)];
+    for (const group of nullRouteGroups) {
+      const clientOffset = group[0].indexOf(CLIENT_CASE);
+      if (clientOffset === -1) {
+        continue;
+      }
+      if (group[0].indexOf(CLIENT_CASE, clientOffset + CLIENT_CASE.length) !== -1) {
         die(`multiple vulnerable resolvers in ${file.path}`);
       }
-      const homeIndex = source.lastIndexOf(HOME_CASE, tailIndex);
-      const resolverPrefix = source.slice(Math.max(0, homeIndex - 100), homeIndex);
-      const resolverBody = source.slice(homeIndex, tailIndex);
-      if (
-        homeIndex === -1 ||
-        tailIndex - homeIndex > 700 ||
-        !/function\s+[A-Za-z_$][\w$]*\(([A-Za-z_$][\w$]*)\)\{(?:if\(\1\.get\([A-Za-z_$][\w$]*\)\)return null;)?switch\(\1\.value\.routeKind\)\{$/.test(
-          resolverPrefix,
-        ) ||
-        !resolverBody.includes(".value.clientThreadId") ||
-        !resolverBody.includes("conversationId:") ||
-        !resolverBody.includes("cwd:") ||
-        !resolverBody.includes("hostId:")
-      ) {
+
+      const clientIndex = group.index + clientOffset;
+      const homeIndex = source.lastIndexOf(HOME_CASE, clientIndex);
+      if (homeIndex === -1 || !resolverShape(source, homeIndex, clientIndex)) {
         die(`terminal resolver shape changed in ${file.path}`);
       }
-      vulnerable.push({ contents, file, homeIndex, position, source, tailIndex });
+      vulnerable.push({ clientIndex, contents, file, homeIndex, position, source });
     }
 
-    const patchedTailIndex = source.indexOf(PATCHED_TAIL);
-    if (patchedTailIndex !== -1) {
-      const patchedPrefixIndex = source.lastIndexOf(PATCHED_PREFIX, patchedTailIndex);
-      const patchedBody = source.slice(patchedPrefixIndex, patchedTailIndex);
-      if (
-        patchedPrefixIndex !== -1 &&
-        patchedTailIndex - patchedPrefixIndex <= 700 &&
-        patchedBody.includes(".value.clientThreadId") &&
-        patchedBody.includes("conversationId:") &&
-        patchedBody.includes("cwd:") &&
-        patchedBody.includes("hostId:")
-      ) {
+    let patchedPrefixIndex = source.indexOf(PATCHED_PREFIX);
+    while (patchedPrefixIndex !== -1) {
+      const homeIndex = patchedPrefixIndex + CLIENT_CASE.length;
+      if (resolverShape(source, homeIndex, homeIndex + 700, patchedPrefixIndex)) {
         alreadyPatched += 1;
       }
+      patchedPrefixIndex = source.indexOf(PATCHED_PREFIX, patchedPrefixIndex + 1);
     }
   }
 
@@ -157,10 +154,9 @@ try {
   }
 
   const target = vulnerable[0];
-  const beforeTail = target.source.slice(target.homeIndex, target.tailIndex);
-  const patchedTail = VULNERABLE_TAIL.replace(CLIENT_CASE, "");
-  const originalSpan = `${beforeTail}${VULNERABLE_TAIL}`;
-  const patchedSpan = `${CLIENT_CASE}${beforeTail}${patchedTail}`;
+  const beforeClient = target.source.slice(target.homeIndex, target.clientIndex);
+  const originalSpan = `${beforeClient}${CLIENT_CASE}`;
+  const patchedSpan = `${CLIENT_CASE}${beforeClient}`;
   if (Buffer.byteLength(originalSpan) !== Buffer.byteLength(patchedSpan)) {
     die("internal error: terminal route rewrite changed byte length");
   }
@@ -175,7 +171,10 @@ try {
   const homeByteOffset = Buffer.byteLength(target.source.slice(0, target.homeIndex), "utf8");
   patchedContents.write(patchedSpan, homeByteOffset, "utf8");
   const verified = patchedContents.toString("utf8");
-  if (!verified.includes(PATCHED_PREFIX) || verified.includes(VULNERABLE_TAIL)) {
+  const stillVulnerable = [...verified.matchAll(NULL_ROUTE_GROUP)].some((group) =>
+    group[0].includes(CLIENT_CASE),
+  );
+  if (!verified.includes(PATCHED_PREFIX) || stillVulnerable) {
     die("internal error: terminal route rewrite did not verify");
   }
 

@@ -133,6 +133,31 @@ try {
   assert.strictEqual(result.status, 0, result.stderr);
   assert.match(result.stdout, /already patched/);
 
+  const expandedPath = path.join(work, "expanded-routes.asar");
+  const expandedSource = Buffer.from(
+    source
+      .toString()
+      .replace(
+        vulnerableTail,
+        vulnerableTail.replace(
+          "case`remote-thread`:",
+          "case`new-route-kind`:case`remote-thread`:",
+        ),
+      ),
+  );
+  makeAsar(expandedPath, expandedSource);
+  result = run("--check", expandedPath);
+  assert.strictEqual(result.status, 0, result.stderr);
+  result = run(expandedPath);
+  assert.strictEqual(result.status, 0, result.stderr);
+  const expandedPatched = readAsar(expandedPath).contents.toString();
+  assert.ok(expandedPatched.includes("case`new-route-kind`:"));
+  assert.ok(expandedPatched.includes(`${clientCase}case\`home\`:`));
+  assert.ok(!expandedPatched.includes(`${clientCase}case\`remote-thread\`:`));
+  result = run(expandedPath);
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.match(result.stdout, /already patched/);
+
   const guardedPath = path.join(work, "guarded.asar");
   makeAsar(
     guardedPath,
@@ -167,7 +192,7 @@ try {
   assert.notStrictEqual(result.status, 0);
   assert.match(result.stderr, /review the upstream bundle/);
 
-  console.log("patch-terminal-route: 7 ok, 0 failed");
+  console.log("patch-terminal-route: 8 ok, 0 failed");
 } finally {
   fs.rmSync(work, { force: true, recursive: true });
 }
